@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<!-- Header de Sección -->
+<section class="bg-primary text-white py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8 text-center">
+                <h2 class="display-5 fw-bold mb-3">Conoce Nuestro Cole</h2>
+                <p class="lead mb-0">Reserva una visita personalizada para conocer nuestras instalaciones y proyecto educativo</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Breadcrumb -->
+<nav class="bg-light border-bottom py-2">
+    <div class="container">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Inicio</a></li>
+            <li class="breadcrumb-item active">Reservar Visita</li>
+        </ol>
+    </div>
+</nav>
+
+<!-- Contenido Principal -->
+<div id="booking-app"></div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stage-icon {
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .hover-shadow {
+        transition: all 0.3s ease-in-out;
+    }
+    .hover-shadow:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    window.SCHOOL_STAGES = {{ stages_json|safe }};
+</script>
+<script src="{% static 'visits/js/public_booking.js' %}"></script>
+{% endblock %}

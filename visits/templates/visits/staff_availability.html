@@ -1,0 +1,283 @@
+<!-- templates/visits/staff_availability.html -->
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+   <ul class="nav nav-tabs mb-3">
+       <li class="nav-item">
+           <a class="nav-link active" data-bs-toggle="tab" href="#single">Fecha específica</a>
+       </li>
+       <li class="nav-item">
+           <a class="nav-link" data-bs-toggle="tab" href="#recurring">Recurrente</a>
+       </li>
+   </ul>
+
+   <div class="tab-content">
+       <!-- Single Date Form -->
+       <div class="tab-pane active" id="single">
+           <div class="card mb-4">
+               <div class="card-header bg-primary text-white">
+                   <h4 class="m-0">Añadir disponibilidad única</h4>
+               </div>
+               <div class="card-body">
+                   <form id="single-form">
+                       {% csrf_token %}
+                       <input type="hidden" name="stage" value="{{ request.user.staffprofile.allowed_stages.first.id }}">
+                       <input type="hidden" name="repeat_type" value="once">
+                       <div class="row g-3">
+                           <div class="col-md-3">
+                               <label class="form-label">Fecha</label>
+                               <input type="date" name="date" class="form-control" required
+                                      min="{{ now|date:'Y-m-d' }}">
+                           </div>
+                           <div class="col-md-3">
+                               <label class="form-label">Hora inicio</label>
+                               <select name="start_time" class="form-select" required>
+                                   <option value="00:00">00:00</option>
+                                   <option value="00:15">00:15</option>
+                                   <option value="00:30">00:30</option>
+                                   <option value="00:45">00:45</option>
+                                   <!-- Repetir para cada hora -->
+                                   <option value="23:00">23:00</option>
+                                   <option value="23:15">23:15</option>
+                                   <option value="23:30">23:30</option>
+                                   <option value="23:45">23:45</option>
+                               </select>
+                           </div>
+                           <div class="col-md-3">
+                               <label class="form-label">Hora fin</label>
+                               <select name="end_time" class="form-select" required>
+                                   <option value="00:00">00:00</option>
+                                   <option value="00:15">00:15</option>
+                                   <option value="00:30">00:30</option>
+                                   <option value="00:45">00:45</option>
+                                   <!-- Repetir para cada hora -->
+                                   <option value="23:00">23:00</option>
+                                   <option value="23:15">23:15</option>
+                                   <option value="23:30">23:30</option>
+                                   <option value="23:45">23:45</option>
+                               </select>
+                           </div>
+                           <div class="col-md-3">
+                               <label class="form-label">Duración</label>
+                               <select name="duration" class="form-select" required>
+                                   <option value="30">30 minutos</option>
+                                   <option value="45">45 minutos</option>
+                                   <option value="60">1 hora</option>
+                               </select>
+                           </div>
+                       </div>
+                       <button type="submit" class="btn btn-primary mt-3">Añadir</button>
+                   </form>
+               </div>
+           </div>
+       </div>
+
+       <!-- Recurring Form -->
+       <div class="tab-pane" id="recurring">
+           <div class="card mb-4">
+               <div class="card-header bg-primary text-white">
+                   <h4 class="m-0">Añadir disponibilidad recurrente</h4>
+               </div>
+               <div class="card-body">
+                   <form id="recurring-form">
+                       {% csrf_token %}
+                       <input type="hidden" name="stage" value="{{ request.user.staffprofile.allowed_stages.first.id }}">
+                       <input type="hidden" name="repeat_type" value="weekly">
+                       <div class="row g-3">
+                           <div class="col-md-3">
+                               <label class="form-label">Mes</label>
+                               <select name="month" class="form-select" required>
+                                   <option value="1">Enero</option>
+                                   <option value="2">Febrero</option>
+                                   <option value="3">Marzo</option>
+                                   <option value="4">Abril</option>
+                                   <option value="5">Mayo</option>
+                                   <option value="6">Junio</option>
+                                   <option value="7">Julio</option>
+                                   <option value="8">Agosto</option>
+                                   <option value="9">Septiembre</option>
+                                   <option value="10">Octubre</option>
+                                   <option value="11">Noviembre</option>
+                                   <option value="12">Diciembre</option>
+                               </select>
+                           </div>
+                           <div class="col-md-3">
+                               <label class="form-label">Día de la semana</label>
+                               <select name="weekday" class="form-select" required>
+                                   <option value="0">Lunes</option>
+                                   <option value="1">Martes</option>
+                                   <option value="2">Miércoles</option>
+                                   <option value="3">Jueves</option>
+                                   <option value="4">Viernes</option>
+                               </select>
+                           </div>
+                           <div class="col-md-2">
+                               <label class="form-label">Hora inicio</label>
+                               <select name="start_time" class="form-select" required>
+                                   <option value="00:00">00:00</option>
+                                   <option value="00:15">00:15</option>
+                                   <option value="00:30">00:30</option>
+                                   <option value="00:45">00:45</option>
+                                   <!-- Repetir para cada hora -->
+                                   <option value="23:00">23:00</option>
+                                   <option value="23:15">23:15</option>
+                                   <option value="23:30">23:30</option>
+                                   <option value="23:45">23:45</option>
+                               </select>
+                           </div>
+                           <div class="col-md-2">
+                               <label class="form-label">Hora fin</label>
+                               <select name="end_time" class="form-select" required>
+                                   <option value="00:00">00:00</option>
+                                   <option value="00:15">00:15</option>
+                                   <option value="00:30">00:30</option>
+                                   <option value="00:45">00:45</option>
+                                   <!-- Repetir para cada hora -->
+                                   <option value="23:00">23:00</option>
+                                   <option value="23:15">23:15</option>
+                                   <option value="23:30">23:30</option>
+                                   <option value="23:45">23:45</option>
+                               </select>
+                           </div>
+                           <div class="col-md-2">
+                               <label class="form-label">Duración</label>
+                               <select name="duration" class="form-select" required>
+                                   <option value="30">30 min</option>
+                                   <option value="45">45 min</option>
+                                   <option value="60">1 hora</option>
+                               </select>
+                           </div>
+                       </div>
+                       <button type="submit" class="btn btn-primary mt-3">Añadir</button>
+                   </form>
+               </div>
+           </div>
+       </div>
+   </div>
+
+   <!-- Table -->
+   <div class="card">
+       <div class="card-body">
+           <table id="slots-table" class="table table-striped">
+               <thead>
+                   <tr>
+                       <th>Fecha</th>
+                       <th>Horario</th>
+                       <th>Duración</th>
+                       <th>Acciones</th>
+                   </tr>
+               </thead>
+           </table>
+       </div>
+   </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+
+<script>
+// Función para generar las opciones de hora
+function generateTimeOptions() {
+   const selects = document.querySelectorAll('select[name="start_time"], select[name="end_time"]');
+   selects.forEach(select => {
+       for(let hour = 0; hour < 24; hour++) {
+           for(let min of [0, 15, 30, 45]) {
+               const time = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
+               const option = new Option(time, time);
+               select.appendChild(option);
+           }
+       }
+   });
+}
+
+$(document).ready(function() {
+   // Generar opciones de hora
+   generateTimeOptions();
+
+   const table = $('#slots-table').DataTable({
+       data: {{ slots_json|safe }},
+       columns: [
+           { data: 'date' },
+           { 
+               data: null,
+               render: function(data) {
+                   return `${data.start_time} - ${data.end_time}`;
+               }
+           },
+           { data: 'duration', render: d => d + ' min' },
+           {
+               data: 'id',
+               render: function(id) {
+                   return `<button onclick="deleteSlot(${id})" class="btn btn-danger btn-sm">Eliminar</button>`;
+               }
+           }
+       ],
+       order: [[0, 'asc'], [1, 'asc']],
+       language: {
+           url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json'
+       }
+   });
+
+   function handleFormSubmit(formId) {
+       $(`#${formId}`).on('submit', async function(e) {
+           e.preventDefault();
+           const formData = new FormData(this);
+
+           try {
+               const response = await fetch('/availability/', {
+                   method: 'POST',
+                   body: formData,
+                   headers: {
+                       'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                   }
+               });
+
+               if (!response.ok) {
+                   const error = await response.json();
+                   throw new Error(error.error || 'Error al guardar');
+               }
+
+               const data = await response.json();
+               if (data.slots) {
+                   data.slots.forEach(slot => table.row.add(slot).draw());
+               }
+               this.reset();
+           } catch (error) {
+               alert(error.message);
+               console.error('Error:', error);
+           }
+       });
+   }
+
+   handleFormSubmit('single-form');
+   handleFormSubmit('recurring-form');
+});
+
+function deleteSlot(id) {
+   if (confirm('¿Confirmas eliminar esta disponibilidad?')) {
+       fetch(`/api/availability/${id}/`, {
+           method: 'DELETE',
+           headers: {
+               'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+           }
+       })
+       .then(response => {
+           if (response.ok) {
+               $('#slots-table').DataTable()
+                   .row($(`button[onclick="deleteSlot(${id})"]`).closest('tr'))
+                   .remove()
+                   .draw();
+           }
+       });
+   }
+}
+</script>
+{% endblock %}

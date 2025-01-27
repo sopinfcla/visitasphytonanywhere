@@ -1,0 +1,26 @@
+# Entornos virtuales
+venv/
+*.pyc
+__pycache__/
+
+# Archivos de configuración del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos de logs
+*.log
+
+# Archivos de bases de datos temporales
+db.sqlite3
+
+# Archivos generados por herramientas
+*.pyc
+*.pyo
+
+# Archivos estáticos generados
+staticfiles/
+media/
+
+# Configuración local de IDEs
+.vscode/
+.idea/
