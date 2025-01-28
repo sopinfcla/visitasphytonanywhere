@@ -10,6 +10,11 @@ urlpatterns = [
     # Vistas públicas
     path('', views.PublicBookingView.as_view(), name='public_booking'),
     path('stage/<int:stage_id>/', views.StageBookingView.as_view(), name='stage_booking'),
+    path('stage/<int:stage_id>/book/<int:slot_id>/', views.book_appointment, name='book_appointment'),
+    path('appointment/<int:appointment_id>/confirmation/', 
+         views.AppointmentConfirmationView.as_view(), 
+         name='appointment_confirmation'),
+    path('privacy-policy/', views.PrivacyPolicyView.as_view(), name='privacy_policy'),
     
     # Vistas del panel de administración
     path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
@@ -21,7 +26,4 @@ urlpatterns = [
     path('api/stage/<int:stage_id>/staff/', views.staff_by_stage, name='staff_by_stage'),
     path('api/availability/', views.StaffAvailabilityView.as_view(), name='api_availability'),
     path('api/availability/<int:slot_id>/', views.StaffAvailabilityView.as_view(), name='api_delete_availability'),
-    
-    # Reserva
-    path('stage/<int:stage_id>/book/<int:slot_id>/', views.book_appointment, name='book_appointment'),
 ]

@@ -1,78 +1,316 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container my-5">
-    <!-- Breadcrumb -->
-    <nav aria-label="breadcrumb" class="mb-4">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'public_booking' %}" class="text-decoration-none">Inicio</a></li>
-            <li class="breadcrumb-item active" aria-current="page">{{ stage.name }}</li>
-        </ol>
-    </nav>
-
+<div class="container-fluid px-4 py-4">
     <!-- Header -->
-    <div class="row align-items-center mb-4">
-        <div class="col">
-            <h2 class="mb-0">Disponibilidad de {{ stage.name }}</h2>
-        </div>
-        <div class="col-auto">
-            <a href="{% url 'public_booking' %}" class="btn btn-outline-primary">
-                <i class="fas fa-arrow-left me-2"></i>Volver
+    <div class="row mb-4">
+        <div class="col-12">
+            <a href="{% url 'public_booking' %}" class="text-decoration-none text-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Volver a etapas
             </a>
         </div>
     </div>
 
-    <!-- Calendar -->
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <div id="calendar"></div>
+    <div class="row justify-content-center">
+        <!-- Columna Izquierda: Info -->
+        <div class="col-12 col-md-3 mb-4">
+            <div class="mb-4">
+                <h3 class="h4 mb-3">{{ stage.name }}</h3>
+                <div class="d-flex align-items-center text-secondary mb-2">
+                    <i class="far fa-clock me-2"></i>
+                    <span class="fs-6">30 min</span>
+                </div>
+                <div class="d-flex align-items-start text-secondary">
+                    <i class="fas fa-map-marker-alt me-2 mt-1"></i>
+                    <span class="fs-6">Avenida Padre Claret, 3<br>Segovia</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Columna Central: Calendario -->
+        <div class="col-12 col-md-5">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-0">
+                    <div class="d-flex align-items-center border-bottom p-4">
+                        <div class="flex-grow-1 text-center">
+                            <h5 class="mb-0 fw-normal" id="currentMonth">enero 2025</h5>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm nav-btn" id="prevMonth">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button class="btn btn-sm nav-btn" id="nextMonth">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="calendar"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Columna Derecha: Slots -->
+        <div class="col-12 col-md-3 d-none" id="timeSlots">
+            <div class="px-3">
+                <div class="mb-4">
+                    <h6 class="text-secondary fw-normal" id="selectedDate"></h6>
+                </div>
+                <div id="slots-container" class="d-grid gap-2">
+                    <!-- Los slots se insertan aquí -->
+                </div>
+            </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+.container-fluid {
+    max-width: 1200px;
+}
+
+/* FullCalendar overrides */
+.fc {
+    --fc-border-color: transparent;
+    --fc-day-today-bg-color: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.9rem;
+}
+
+.fc .fc-toolbar {
+    display: none;
+}
+
+.fc .fc-col-header-cell {
+    padding: 8px 0;
+    text-transform: lowercase;
+    font-weight: normal;
+    color: #666;
+    border: none;
+}
+
+.fc .fc-daygrid-day {
+    border: none !important;
+}
+
+.fc .fc-daygrid-day-frame {
+    min-height: 42px;
+    padding: 2px;
+}
+
+.fc .fc-daygrid-day-top {
+    justify-content: center;
+    padding-top: 2px;
+}
+
+.fc .fc-daygrid-day-number {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 2px auto;
+    border-radius: 50%;
+    float: none;
+    font-size: 0.95rem;
+    color: #1a1a1a;
+    text-decoration: none;
+}
+
+.fc .fc-day-today .fc-daygrid-day-number {
+    font-weight: 500;
+    background: none;
+}
+
+.fc .fc-day-past {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.fc .fc-day-other .fc-daygrid-day-number {
+    color: #ccc;
+}
+
+.fc .fc-day-has-slots .fc-daygrid-day-number {
+    background-color: rgba(0, 105, 255, 0.1);
+}
+
+.fc .fc-day-future:not(.fc-day-other):hover .fc-daygrid-day-number {
+    background-color: rgba(0, 105, 255, 0.1);
+    cursor: pointer;
+}
+
+.fc .selected-day .fc-daygrid-day-number {
+    background-color: rgb(0, 105, 255) !important;
+    color: white !important;
+}
+
+/* Botones de navegación */
+.nav-btn {
+    padding: 0.4rem 0.6rem;
+    color: #666;
+    border: 1px solid #dee2e6;
+    background: white;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+}
+
+.nav-btn:hover {
+    color: rgb(0, 105, 255);
+    border-color: rgb(0, 105, 255);
+}
+
+/* Time slots */
+#timeSlots .btn {
+    color: rgb(0, 105, 255);
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    padding: 12px;
+    text-align: center;
+    font-size: 0.9375rem;
+    transition: all 0.15s ease;
+    font-weight: 500;
+}
+
+#timeSlots .btn:hover {
+    color: white;
+    background: rgb(0, 105, 255);
+    border-color: rgb(0, 105, 255);
+}
+
+#selectedDate {
+    font-size: 0.9375rem;
+    text-transform: capitalize;
+}
+</style>
+{% endblock %}
+
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const calendarEl = document.getElementById('calendar');
-    const calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'timeGridWeek',
+    const monthNames = [
+        'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+    ];
+
+    const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+        initialView: 'dayGridMonth',
         locale: 'es',
-        slotMinTime: '08:00:00',
-        slotMaxTime: '20:00:00',
-        allDaySlot: false,
         height: 'auto',
-        headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'timeGridDay,timeGridWeek'
+        headerToolbar: false,
+        dayHeaderFormat: { weekday: 'short' },
+        fixedWeekCount: false,
+        showNonCurrentDates: true,
+        selectable: true,
+        unselectAuto: false,
+        selectConstraint: {
+            start: new Date(),
+            end: new Date(new Date().setMonth(new Date().getMonth() + 3))
         },
-        buttonText: {
-            today: 'Hoy',
-            day: 'Día',
-            week: 'Semana'
+        datesSet: function(info) {
+            const currentDate = info.view.currentStart;
+            document.getElementById('currentMonth').textContent = 
+                monthNames[currentDate.getMonth()] + ' ' + currentDate.getFullYear();
+            loadAvailableDates();
         },
-        events: `/api/stage/{{ stage.id }}/availability/`,
-        eventClick: function(info) {
-            const event = info.event;
-            const date = new Date(event.start).toLocaleDateString('es', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
-            const time = new Date(event.start).toLocaleTimeString('es', { 
-                hour: '2-digit', 
-                minute: '2-digit' 
-            });
+        select: function(info) {
+            loadTimeSlots(info.start);
             
-            if (confirm(`¿Deseas reservar una visita para el ${date} a las ${time}?`)) {
-                window.location.href = `/stage/{{ stage.id }}/book/${event.id}/`;
+            // Formatear fecha seleccionada
+            const date = new Date(info.startStr);
+            const formattedDate = date.toLocaleDateString('es', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long'
+            }).toLowerCase();
+            document.getElementById('selectedDate').textContent = formattedDate;
+            
+            // Resaltar día seleccionado
+            document.querySelectorAll('.fc-day').forEach(day => {
+                day.classList.remove('selected-day');
+            });
+            const selectedDay = document.querySelector(`.fc-day[data-date="${info.startStr}"]`);
+            if (selectedDay) {
+                selectedDay.classList.add('selected-day');
+            }
+        },
+        dayCellDidMount: function(info) {
+            if (info.date < new Date().setHours(0,0,0,0)) {
+                info.el.classList.add('fc-day-disabled');
             }
         }
     });
     
     calendar.render();
+    
+    // Botones de navegación
+    document.getElementById('prevMonth').onclick = () => calendar.prev();
+    document.getElementById('nextMonth').onclick = () => calendar.next();
+    
+    // Cargar días disponibles
+    async function loadAvailableDates() {
+        try {
+            document.querySelectorAll('.fc-day-has-slots').forEach(day => {
+                day.classList.remove('fc-day-has-slots');
+            });
+            
+            const response = await fetch(`/api/stage/{{ stage.id }}/availability/`);
+            const availableDates = await response.json();
+            
+            availableDates.forEach(dateInfo => {
+                const cell = document.querySelector(`.fc-day[data-date="${dateInfo.date}"]`);
+                if (cell) {
+                    cell.classList.add('fc-day-has-slots');
+                }
+            });
+        } catch (error) {
+            console.error('Error cargando fechas disponibles:', error);
+        }
+    }
+    
+    // Cargar slots para un día específico
+    async function loadTimeSlots(date) {
+        try {
+            const formattedDate = date.toISOString().split('T')[0];
+            const response = await fetch(`/api/stage/{{ stage.id }}/availability/?date=${formattedDate}`);
+            const data = await response.json();
+            const slots = Array.isArray(data) ? data : [];
+            
+            const container = document.getElementById('slots-container');
+            container.innerHTML = '';
+            
+            if (slots.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-secondary py-4">
+                        <i class="fas fa-calendar-times mb-3 d-block"></i>
+                        <p class="mb-0">No hay horarios disponibles para esta fecha</p>
+                    </div>`;
+            } else {
+                slots.forEach(slot => {
+                    const time = new Date(slot.start).toLocaleTimeString('es', { 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        hour12: false
+                    });
+                    
+                    const button = document.createElement('button');
+                    button.className = 'btn w-100';
+                    button.innerHTML = `${time}`;
+                    button.onclick = () => window.location.href = `/stage/{{ stage.id }}/book/${slot.id}/`;
+                    
+                    container.appendChild(button);
+                });
+            }
+            
+            document.getElementById('timeSlots').classList.remove('d-none');
+            
+        } catch (error) {
+            console.error('Error cargando slots:', error);
+        }
+    }
 });
 </script>
 {% endblock %}

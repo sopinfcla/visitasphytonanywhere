@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid px-4 py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 text-center">
+            <div class="success-icon mb-4">
+                <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+            </div>
+            
+            <h1 class="h3 mb-4">¡Cita confirmada!</h1>
+            
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body p-4">
+                    <div class="mb-4">
+                        <h5 class="text-secondary mb-3">Detalles de la cita</h5>
+                        <p class="h4 mb-0">{{ appointment.stage.name }}</p>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="row text-start">
+                        <div class="col-md-6 mb-3">
+                            <div class="d-flex align-items-center">
+                                <i class="far fa-calendar text-primary me-3"></i>
+                                <div>
+                                    <small class="text-secondary">Fecha</small>
+                                    <p class="mb-0">{{ appointment.date|date:"l, j \d\e F \d\e Y" }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="d-flex align-items-center">
+                                <i class="far fa-clock text-primary me-3"></i>
+                                <div>
+                                    <small class="text-secondary">Hora</small>
+                                    <p class="mb-0">{{ appointment.date|time:"H:i" }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-map-marker-alt text-primary me-3"></i>
+                                <div>
+                                    <small class="text-secondary">Lugar</small>
+                                    <p class="mb-0">Avenida Padre Claret, 3<br>Segovia</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-user-tie text-primary me-3"></i>
+                                <div>
+                                    <small class="text-secondary">Atendido por</small>
+                                    <p class="mb-0">{{ appointment.staff }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-secondary mb-4">
+                Hemos enviado un email de confirmación a {{ appointment.visitor_email }}
+            </p>
+
+            <a href="{% url 'public_booking' %}" class="btn btn-outline-primary">
+                <i class="fas fa-home me-2"></i>Volver al inicio
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.container-fluid {
+    max-width: 1140px;
+}
+</style>
+{% endblock %}

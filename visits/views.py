@@ -1,9 +1,8 @@
 from django.shortcuts import render, get_object_or_404
 from django.views.generic import TemplateView, View
 from rest_framework import viewsets
-from rest_framework.response import Response
 from django.http import JsonResponse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils.timezone import make_aware
 from django.urls import reverse
@@ -15,7 +14,11 @@ from .models import (
     StaffProfile, 
     AvailabilitySlot
 )
-from .serializers import AppointmentSerializer
+from .serializers import (
+    AppointmentSerializer,
+    AvailabilitySlotSerializer,
+    CalendarDaySerializer
+)
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'visits/dashboard.html'
@@ -109,37 +112,96 @@ def staff_by_stage(request, stage_id):
 
 def get_stage_availability(request, stage_id):
     try:
-        start_date = datetime.now().date()
-        end_date = start_date + timedelta(days=30)
-        
+        # Obtener fecha específica si se proporciona
+        date_param = request.GET.get('date')
+        print(f"Request para stage_id: {stage_id}, date_param: {date_param}")
+
+        if date_param:
+            try:
+                date = datetime.strptime(date_param, '%Y-%m-%d').date()
+                start_date = date
+                end_date = date
+                print(f"Buscando slots para fecha específica: {date}")
+            except ValueError:
+                start_date = datetime.now().date()
+                end_date = start_date
+                print(f"Error en fecha, usando fecha actual: {start_date}")
+        else:
+            # Para vista mensual, obtener todo el mes actual
+            today = datetime.now().date()
+            start_date = today.replace(day=1)
+            if today.month == 12:
+                end_date = today.replace(year=today.year + 1, month=1, day=1) - timedelta(days=1)
+            else:
+                end_date = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
+            print(f"Buscando slots para mes: {start_date} hasta {end_date}")
+
+        # Obtener slots disponibles
         slots = AvailabilitySlot.objects.filter(
             stage_id=stage_id,
             date__range=(start_date, end_date),
             is_active=True
-        ).select_related('staff')
-        
-        booked_slots = Appointment.objects.filter(
-            stage_id=stage_id,
-            date__range=(start_date, end_date)
-        ).values_list('date', flat=True)
-        
-        available_slots = slots.exclude(date__in=booked_slots)
-        
-        data = [{
-            'id': slot.id,
-            'title': f"Disponible con {slot.staff.user.get_full_name()}",
-            'start': make_aware(datetime.combine(slot.date, slot.start_time)).isoformat(),
-            'end': make_aware(datetime.combine(slot.date, slot.end_time)).isoformat(),
-            'duration': slot.duration,
-            'staff_name': slot.staff.user.get_full_name(),
-            'backgroundColor': '#28a745',
-            'borderColor': '#1e7e34'
-        } for slot in available_slots]
-        
-        return JsonResponse(data, safe=False)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        ).select_related('staff__user')
+        print(f"Slots encontrados en BD: {slots.count()}")
 
+        # Obtener citas existentes
+        appointments = Appointment.objects.filter(
+            stage_id=stage_id,
+            date__range=(
+                make_aware(datetime.combine(start_date, time.min)),
+                make_aware(datetime.combine(end_date, time.max))
+            )
+        )
+        print(f"Citas existentes: {appointments.count()}")
+
+        # Excluir slots ocupados
+        booked_datetimes = set(
+            (appt.date.date(), appt.date.time()) 
+            for appt in appointments
+        )
+        
+        available_slots = [
+            slot for slot in slots 
+            if (slot.date, slot.start_time) not in booked_datetimes
+        ]
+        print(f"Slots disponibles después de filtrar: {len(available_slots)}")
+
+        if date_param:
+            # Para día específico: devolver slots detallados ordenados por hora
+            serializer = AvailabilitySlotSerializer(
+                sorted(available_slots, key=lambda x: x.start_time),
+                many=True
+            )
+            data = serializer.data
+            print(f"Devolviendo {len(data)} slots para el día")
+        else:
+            # Para vista mensual: agrupar por fecha
+            dates_with_slots = {}
+            for slot in available_slots:
+                if slot.date not in dates_with_slots:
+                    dates_with_slots[slot.date] = {
+                        'date': slot.date.isoformat(),
+                        'has_slots': True,
+                        'slots_count': 1
+                    }
+                else:
+                    dates_with_slots[slot.date]['slots_count'] += 1
+            
+            data = list(dates_with_slots.values())
+            print(f"Devolviendo {len(data)} días con slots disponibles")
+            print(f"Datos devueltos: {data}")
+
+        return JsonResponse(data, safe=False)
+        
+    except Exception as e:
+        print(f"Error en get_stage_availability: {str(e)}")
+        return JsonResponse({
+            'error': str(e),
+            'details': {
+                'date_param': date_param if 'date_param' in locals() else None,
+                'stage_id': stage_id
+            }
+        }, status=500)
 class StaffAvailabilityView(LoginRequiredMixin, View):
     template_name = 'visits/staff_availability.html'
 
@@ -224,6 +286,12 @@ def book_appointment(request, stage_id, slot_id):
     - GET: Muestra el formulario de reserva
     - POST: Procesa la reserva
     """
+    if request.method == 'POST':
+        if not request.POST.get('privacy_accepted'):
+            return JsonResponse({
+                'error': 'Debe aceptar la política de privacidad'
+            }, status=400)
+            
     stage = get_object_or_404(SchoolStage, id=stage_id)
     slot = get_object_or_404(AvailabilitySlot, id=slot_id, stage_id=stage_id, is_active=True)
 
@@ -254,7 +322,7 @@ def book_appointment(request, stage_id, slot_id):
             return JsonResponse({
                 'status': 'success',
                 'appointment_id': appointment.id,
-                'redirect_url': reverse('public_booking')
+                'redirect_url': reverse('appointment_confirmation', kwargs={'appointment_id': appointment.id})
             })
 
         except Exception as e:
@@ -268,3 +336,15 @@ def book_appointment(request, stage_id, slot_id):
     }
     return render(request, 'visits/book_appointment.html', context)
 
+class PrivacyPolicyView(TemplateView):
+    template_name = 'visits/privacy_policy.html'
+
+class AppointmentConfirmationView(TemplateView):
+    template_name = 'visits/appointment_confirmation.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        appointment_id = kwargs.get('appointment_id')
+        appointment = get_object_or_404(Appointment, id=appointment_id)
+        context['appointment'] = appointment
+        return context   
