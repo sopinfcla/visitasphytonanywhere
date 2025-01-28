@@ -5,8 +5,9 @@ from rest_framework.response import Response
 from django.http import JsonResponse
 from datetime import datetime, timedelta
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.utils.timezone import make_aware
+from django.urls import reverse
 import json
-
 
 from .models import (
     Appointment, 
@@ -34,50 +35,44 @@ class PublicBookingView(TemplateView):
         context = super().get_context_data(**kwargs)
         
         stages = []
-        for stage in SchoolStage.objects.all().order_by('id'):
+        # Obtener todas las etapas y su personal asignado
+        for stage in SchoolStage.objects.all().prefetch_related('staffprofile_set'):
+            # Datos base de la etapa desde BD
             stage_data = {
                 'id': stage.id,
                 'name': stage.name,
                 'description': stage.description,
+                'staff': [{'id': s.id, 'name': s.user.get_full_name()} 
+                         for s in stage.staffprofile_set.all()]
             }
             
-            if stage.id == 1:  # Primer ciclo de Educación Infantil
-                stage_data.update({
-                    'name': 'Escuela Infantil',
-                    'description': 'Primer ciclo de educación infantil',
-                    'subtitle': 'Primer Ciclo',
-                    'features': ['Programa bilingüe', 'Nuevas tecnologías', 'Desarrollo personal'],
-                    'icon': '👶'
-                })
-            elif stage.id == 2:  # Segundo ciclo de Educación Infantil
-                stage_data.update({
-                    'name': 'Infantil',
-                    'description': 'Segundo ciclo de educación infantil',
-                    'subtitle': 'Segundo Ciclo',
-                    'features': ['Orientación académica', 'Preparación EvAU', 'Actividades extraescolares'],
-                    'icon': '🎨'
-                })
-            elif stage.id == 3:  # Primaria
-                stage_data.update({
-                    'name': 'Primaria',
-                    'description': 'Educación primaria',
-                    'features': ['Ciencias', 'Humanidades', 'Orientación universitaria'],
-                    'icon': '📚'
-                })
-            elif stage.id == 4:  # Secundaria
-                stage_data.update({
-                    'name': 'Secundaria',
-                    'description': 'Educación Secundaria',
-                    'features': ['Orientación académica', 'Innovación educativa', 'Formación integral'],
-                    'icon': '🔬'
-                })
-            elif stage.id == 5:  # Bachillerato
-                stage_data.update({
-                    'name': 'Bachillerato',
-                    'description': 'Bachillerato',
-                    'features': ['Ciencias', 'Humanidades', 'Orientación universitaria'],
-                    'icon': '🎓'
-                })
+            # Metadata adicional por etapa
+            metadata = {
+                'Escuela Infantil': {
+                    'icon': '👶',
+                    'features': ['Programa bilingüe', 'Nuevas tecnologías', 'Desarrollo personal']
+                },
+                'Infantil': {
+                    'icon': '🎨',
+                    'features': ['Aprendizaje lúdico', 'Desarrollo creativo', 'Socialización']
+                },
+                'Primaria': {
+                    'icon': '📚',
+                    'features': ['Ciencias', 'Humanidades', 'Orientación académica']
+                },
+                'Secundaria': {
+                    'icon': '🔬',
+                    'features': ['Orientación académica', 'Innovación educativa', 'Formación integral']
+                },
+                'Bachillerato': {
+                    'icon': '🎓',
+                    'features': ['Ciencias', 'Humanidades', 'Orientación universitaria']
+                }
+            }
+            
+            # Añadir metadata si existe para la etapa
+            if stage.name in metadata:
+                stage_data.update(metadata[stage.name])
                 
             stages.append(stage_data)
         
@@ -109,7 +104,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
 def staff_by_stage(request, stage_id):
     staff = StaffProfile.objects.filter(allowed_stages=stage_id)
-    data = [{'id': s.id, 'name': str(s)} for s in staff]
+    data = [{'id': s.id, 'name': s.user.get_full_name()} for s in staff]
     return JsonResponse(data, safe=False)
 
 def get_stage_availability(request, stage_id):
@@ -117,23 +112,19 @@ def get_stage_availability(request, stage_id):
         start_date = datetime.now().date()
         end_date = start_date + timedelta(days=30)
         
-        # Filtrar slots activos para el rango de fechas
         slots = AvailabilitySlot.objects.filter(
             stage_id=stage_id,
             date__range=(start_date, end_date),
             is_active=True
         ).select_related('staff')
         
-        # Obtener los slots ya reservados
         booked_slots = Appointment.objects.filter(
             stage_id=stage_id,
             date__range=(start_date, end_date)
         ).values_list('date', flat=True)
         
-        # Excluir los slots reservados
         available_slots = slots.exclude(date__in=booked_slots)
         
-        # Transformar los datos para FullCalendar
         data = [{
             'id': slot.id,
             'title': f"Disponible con {slot.staff.user.get_full_name()}",
@@ -141,11 +132,11 @@ def get_stage_availability(request, stage_id):
             'end': make_aware(datetime.combine(slot.date, slot.end_time)).isoformat(),
             'duration': slot.duration,
             'staff_name': slot.staff.user.get_full_name(),
-            'backgroundColor': '#28a745',  # Color verde para diferenciar disponibilidad
+            'backgroundColor': '#28a745',
             'borderColor': '#1e7e34'
         } for slot in available_slots]
         
-        return JsonResponse(data, safe=False)  # JSON para FullCalendar
+        return JsonResponse(data, safe=False)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
@@ -226,7 +217,54 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
             return JsonResponse({'status': 'success'})
         except AvailabilitySlot.DoesNotExist:
             return JsonResponse({'error': 'Slot not found'}, status=404)
-        
-def stage_booking_view(request, stage_id):
+
+def book_appointment(request, stage_id, slot_id):
+    """
+    Vista para gestionar la reserva de citas:
+    - GET: Muestra el formulario de reserva
+    - POST: Procesa la reserva
+    """
     stage = get_object_or_404(SchoolStage, id=stage_id)
-    return render(request, 'visits/stage_booking.html', {'stage': stage})
+    slot = get_object_or_404(AvailabilitySlot, id=slot_id, stage_id=stage_id, is_active=True)
+
+    if request.method == 'POST':
+        try:
+            # Verificar que el slot no esté ya reservado
+            if Appointment.objects.filter(
+                stage=stage,
+                date__date=slot.date,
+                date__time__range=(slot.start_time, slot.end_time)
+            ).exists():
+                return JsonResponse({'error': 'Horario no disponible'}, status=400)
+
+            # Crear la cita
+            appointment = Appointment.objects.create(
+                stage=stage,
+                staff=slot.staff,
+                visitor_name=request.POST.get('visitor_name'),
+                visitor_email=request.POST.get('visitor_email'),
+                visitor_phone=request.POST.get('visitor_phone'),
+                date=make_aware(datetime.combine(slot.date, slot.start_time))
+            )
+
+            # Marcar slot como no disponible
+            slot.is_active = False
+            slot.save()
+
+            return JsonResponse({
+                'status': 'success',
+                'appointment_id': appointment.id,
+                'redirect_url': reverse('public_booking')
+            })
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    # GET: Mostrar formulario
+    context = {
+        'stage': stage,
+        'slot': slot,
+        'staff_name': slot.staff.user.get_full_name()
+    }
+    return render(request, 'visits/book_appointment.html', context)
+

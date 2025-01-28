@@ -1,31 +1,78 @@
-<!-- templates/visits/stage_booking.html -->
 {% extends 'base.html' %}
 
 {% block content %}
 <div class="container my-5">
-    <h2 class="mb-4 text-center">Disponibilidad de {{ stage.name }}</h2>
-    <div id="calendar"></div>
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'public_booking' %}" class="text-decoration-none">Inicio</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ stage.name }}</li>
+        </ol>
+    </nav>
+
+    <!-- Header -->
+    <div class="row align-items-center mb-4">
+        <div class="col">
+            <h2 class="mb-0">Disponibilidad de {{ stage.name }}</h2>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'public_booking' %}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-2"></i>Volver
+            </a>
+        </div>
+    </div>
+
+    <!-- Calendar -->
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div id="calendar"></div>
+        </div>
+    </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        var calendarEl = document.getElementById('calendar');
-
-        var calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'timeGridWeek', // Vista semanal con horas
-            headerToolbar: {
-                start: 'prev,next today', // Botones de navegación
-                center: 'title',         // Título centrado
-                end: 'timeGridDay,timeGridWeek' // Botones para cambiar de vista
-            },
-            events: `/availability/{{ stage.id }}/`, // Endpoint para los eventos
-            eventClick: function(info) {
-                // Acción al hacer clic en un evento
-                alert(`Has seleccionado: ${info.event.title}`);
+document.addEventListener('DOMContentLoaded', function() {
+    const calendarEl = document.getElementById('calendar');
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'timeGridWeek',
+        locale: 'es',
+        slotMinTime: '08:00:00',
+        slotMaxTime: '20:00:00',
+        allDaySlot: false,
+        height: 'auto',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'timeGridDay,timeGridWeek'
+        },
+        buttonText: {
+            today: 'Hoy',
+            day: 'Día',
+            week: 'Semana'
+        },
+        events: `/api/stage/{{ stage.id }}/availability/`,
+        eventClick: function(info) {
+            const event = info.event;
+            const date = new Date(event.start).toLocaleDateString('es', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            const time = new Date(event.start).toLocaleTimeString('es', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+            
+            if (confirm(`¿Deseas reservar una visita para el ${date} a las ${time}?`)) {
+                window.location.href = `/stage/{{ stage.id }}/book/${event.id}/`;
             }
-        });
-
-        calendar.render();
+        }
     });
+    
+    calendar.render();
+});
 </script>
 {% endblock %}
