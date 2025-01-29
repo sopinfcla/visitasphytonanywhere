@@ -34,24 +34,41 @@
             color: white;
             opacity: 0.8;
         }
+
+        .nav-link {
+            transition: opacity 0.2s ease;
+        }
+        .nav-link:hover {
+            opacity: 0.8;
+        }
+
+        .logo-link {
+            transition: opacity 0.2s ease;
+        }
+        .logo-link:hover {
+            opacity: 0.9;
+        }
     </style>
 </head>
 <body class="min-vh-100 d-flex flex-column">
     <!-- Header Desktop -->
-    <header class="bg-primary text-white shadow-sm">
+    <header class="bg-primary text-white shadow-sm d-none d-md-block">
         <div class="container">
             <div class="d-flex align-items-center justify-content-between" style="height: 80px;">
-                <div class="d-flex align-items-center gap-3">
+                <a href="{% url 'public_booking' %}" class="logo-link d-flex align-items-center text-white text-decoration-none">
                     <img 
                         src="{% static 'visits/images/logo.png' %}" 
                         alt="Colegio Claretianos Segovia" 
-                        class="height-56"
                         style="height: 56px; width: auto;"
                     >
-                    <div class="d-none d-md-block bg-white opacity-25" style="width: 1px; height: 40px;"></div>
+                    <div class="bg-white opacity-25 mx-3" style="width: 1px; height: 40px;"></div>
                     <h1 class="h4 m-0">Reserva tu Visita al Cole</h1>
-                </div>
-                <nav class="d-none d-md-flex align-items-center gap-4">
+                </a>
+                <nav class="d-flex align-items-center gap-4">
+                    <a class="text-white text-decoration-none {% if request.resolver_match.url_name == 'public_booking' %}fw-bold{% endif %}" 
+                       href="{% url 'public_booking' %}">
+                       <i class="fas fa-home me-2"></i>Inicio
+                    </a>
                     {% if user.is_authenticated %}
                         {% if user.is_staff %}
                             <a class="text-white text-decoration-none {% if request.resolver_match.url_name == 'dashboard' %}fw-bold{% endif %}" 
@@ -75,12 +92,27 @@
     <!-- Header Mobile -->
     <nav class="navbar navbar-dark bg-primary d-md-none">
         <div class="container">
+            <a href="{% url 'public_booking' %}" class="navbar-brand d-flex align-items-center">
+                <img 
+                    src="{% static 'visits/images/logo.png' %}" 
+                    alt="Colegio Claretianos Segovia" 
+                    style="height: 48px; width: auto;"
+                    class="me-2"
+                >
+                <span class="h5 mb-0">Reserva tu Visita</span>
+            </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
                     aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
+            <div class="collapse navbar-collapse mt-2" id="navbarNav">
                 <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'public_booking' %}active{% endif %}" 
+                           href="{% url 'public_booking' %}">
+                           <i class="fas fa-home me-2"></i>Inicio
+                        </a>
+                    </li>
                     {% if user.is_authenticated %}
                         {% if user.is_staff %}
                             <li class="nav-item">
