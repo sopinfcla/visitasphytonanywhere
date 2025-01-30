@@ -28,6 +28,7 @@ class Appointment(models.Model):
     visitor_phone = models.CharField(max_length=20)
     date = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
+    comments = models.TextField(blank=True, null=True)  # Nuevo campo añadido
 
     class Meta:
         ordering = ['-date']
@@ -61,6 +62,7 @@ class AvailabilitySlot(models.Model):
     repeat_type = models.CharField(max_length=10, choices=REPEAT_CHOICES, default='once')
     month = models.IntegerField(null=True, blank=True)
     weekday = models.IntegerField(null=True, blank=True)
+    comments = models.TextField(blank=True)
 
     class Meta:
         ordering = ['date', 'start_time']
@@ -70,20 +72,33 @@ class AvailabilitySlot(models.Model):
         ]
 
     def clean(self):
-        if self.repeat_type == 'once' and not self.date:
-            raise ValidationError('La fecha es requerida para slots no recurrentes')
+        # Validación para slots no recurrentes
+        if self.repeat_type == 'once':
+            if not self.date:
+                raise ValidationError({'date': 'La fecha es requerida para slots no recurrentes'})
+            # Establecer month y weekday a None para evitar confusiones
+            self.month = None
+            self.weekday = None
         
-        if self.repeat_type == 'weekly' and (self.month is None or self.weekday is None):
-            raise ValidationError('Mes y día de la semana son requeridos para slots semanales')
+        # Validación para slots semanales
+        elif self.repeat_type == 'weekly':
+            if self.month is None or self.weekday is None:
+                raise ValidationError({
+                    'month': 'Mes requerido para slots semanales',
+                    'weekday': 'Día de la semana requerido para slots semanales'
+                })
+            # Establecer date a None para slots semanales
+            self.date = None
         
+        # Validaciones comunes
         if self.end_time <= self.start_time:
-            raise ValidationError('La hora de fin debe ser posterior a la hora de inicio')
+            raise ValidationError({'end_time': 'La hora de fin debe ser posterior a la hora de inicio'})
         
         if self.duration <= 0:
-            raise ValidationError('La duración debe ser positiva')
+            raise ValidationError({'duration': 'La duración debe ser positiva'})
         
         if self.stage not in self.staff.allowed_stages.all():
-            raise ValidationError('Este miembro del staff no puede atender esta etapa')
+            raise ValidationError({'stage': 'Este miembro del staff no puede atender esta etapa'})
 
     def save(self, *args, **kwargs):
         self.full_clean()

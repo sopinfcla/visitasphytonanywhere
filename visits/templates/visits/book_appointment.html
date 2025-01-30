@@ -9,30 +9,33 @@
                 <a href="{% url 'stage_booking' stage.id %}" class="text-decoration-none text-muted mb-4 d-inline-block">
                     <i class="fas fa-arrow-left me-2"></i>Volver a selección de horario
                 </a>
-                <h3 class="h4 mb-4">{{ stage.name }}</h3>
+                <h4 class="mb-4">{{ stage.name }}</h4>
                 <div class="mb-4 pb-4 border-bottom">
                     <div class="d-flex align-items-center mb-3">
-                        <i class="far fa-clock text-muted me-2"></i>
+                        <i class="far fa-clock text-primary me-2"></i>
                         <span>30 min</span>
                     </div>
                     <div class="d-flex align-items-start mb-3">
-                        <i class="fas fa-map-marker-alt text-muted me-2 mt-1"></i>
-                        <span>Avenida Padre Claret, 3<br>Segovia</span>
+                        <i class="fas fa-map-marker-alt text-primary me-2 mt-1"></i>
+                        <div>
+                            <span>Avenida Padre Claret, 3</span>
+                            <span class="d-block text-muted">Segovia</span>
+                        </div>
                     </div>
-                    <div class="d-flex align-items-center text-muted">
-                        <i class="fas fa-user-tie me-2"></i>
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-user-tie text-primary me-2"></i>
                         <span>{{ staff_name }}</span>
                     </div>
                 </div>
-                <div class="selected-slot p-3 bg-light rounded">
+                <div class="selected-slot p-3 rounded shadow-sm" style="background-color: #f8faff; border: 1px solid #e5e9f2;">
                     <h6 class="text-muted mb-3">Tu horario seleccionado:</h6>
                     <div class="d-flex align-items-center">
                         <i class="far fa-calendar text-primary me-2"></i>
-                        <span class="fw-medium">{{ slot.date|date:"l, j \d\e F \d\e Y" }}</span>
+                        <span>{{ slot.date|date:"l, j \d\e F \d\e Y" }}</span>
                     </div>
                     <div class="d-flex align-items-center mt-2">
                         <i class="far fa-clock text-primary me-2"></i>
-                        <span class="fw-medium">{{ slot.start_time|time:"H:i" }}</span>
+                        <span>{{ slot.start_time|time:"H:i" }}</span>
                     </div>
                 </div>
             </div>
@@ -42,34 +45,54 @@
         <div class="col-12 col-md-8 col-lg-5">
             <div class="card border-0 shadow-sm">
                 <div class="card-body p-4">
-                    <h5 class="mb-4">Introduce tus datos</h5>
+                    <h4 class="mb-4">Introduce tus datos</h4>
                     <form id="bookingForm" method="POST">
                         {% csrf_token %}
+                        <input type="hidden" name="timezone_offset" id="timezone_offset">
+                        
                         <div class="mb-3">
-                            <label for="visitor_name" class="form-label">Nombre completo</label>
+                            <label for="visitor_name" class="form-label">NOMBRE COMPLETO</label>
                             <input type="text" class="form-control" id="visitor_name" name="visitor_name" required>
                         </div>
+                        
                         <div class="mb-3">
-                            <label for="visitor_email" class="form-label">Email</label>
+                            <label for="visitor_email" class="form-label">EMAIL</label>
                             <input type="email" class="form-control" id="visitor_email" name="visitor_email" required>
                         </div>
-                        <div class="mb-4">
-                            <label for="visitor_phone" class="form-label">Teléfono</label>
-                            <input type="tel" class="form-control" id="visitor_phone" name="visitor_phone" required>
+                        
+                        <div class="mb-3">
+                            <label for="visitor_phone" class="form-label">TELÉFONO</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-phone text-muted"></i>
+                                </span>
+                                <input type="tel" class="form-control" 
+                                       id="visitor_phone" name="visitor_phone" 
+                                       required>
+                            </div>
+                            <div class="invalid-feedback">
+                                El teléfono debe tener 9 dígitos
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="comments" class="form-label">COMENTARIOS (OPCIONAL)</label>
+                            <textarea class="form-control" id="comments" name="comments" 
+                                      rows="3" placeholder="Añade cualquier información adicional"></textarea>
                         </div>
 
                         <!-- Política de privacidad -->
                         <div class="mb-4">
                             <div class="form-check">
                                 <input type="checkbox" class="form-check-input" id="privacy_accepted" name="privacy_accepted" required>
-                                <label class="form-check-label text-secondary" for="privacy_accepted">
-                                    Al programar esta cita, acepto la <a href="{% url 'privacy_policy' %}" target="_blank" class="text-decoration-none">política de privacidad</a> del centro
+                                <label class="form-check-label" for="privacy_accepted">
+                                    Al programar esta cita, acepto la <a href="{% url 'privacy_policy' %}" target="_blank">política de privacidad</a> del centro
                                 </label>
                             </div>
                         </div>
 
-                        <button type="submit" class="btn btn-primary w-100 py-2">
-                            <i class="fas fa-calendar-check me-2"></i>Confirmar cita
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-calendar-check me-2"></i>Programar cita
                         </button>
                     </form>
                 </div>
@@ -81,59 +104,47 @@
 
 {% block extra_css %}
 <style>
-/* Estilos Calendly */
 .container-fluid {
     max-width: 1140px;
 }
 .form-control {
     border-color: #e5e7eb;
-    padding: 0.75rem 1rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.95rem;
 }
 .form-control:focus {
     border-color: #0053f0;
     box-shadow: 0 0 0 3px rgba(0,83,240,0.1);
 }
 .form-label {
-    font-size: 0.95rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    color: #6b7280;
     margin-bottom: 0.5rem;
-    color: #1a1a1a;
 }
 .btn-primary {
-    --bs-btn-bg: #0053f0;
-    --bs-btn-border-color: #0053f0;
-    --bs-btn-hover-bg: #0045cc;
-    --bs-btn-hover-border-color: #0045cc;
+    background-color: #0053f0;
+    border-color: #0053f0;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
 }
-.selected-slot {
-    background-color: #f3f7ff !important;
-    border: 1px solid #e5e7eb;
+.btn-primary:hover {
+    background-color: #0045cc;
+    border-color: #0045cc;
 }
-.fw-medium {
-    font-weight: 500;
-}
-/* Estilos para el checkbox de privacidad */
-.form-check-input {
-    border-color: #e5e7eb;
-    width: 1.1em;
-    height: 1.1em;
+.text-primary {
+    color: #0053f0 !important;
 }
 .form-check-input:checked {
     background-color: #0053f0;
     border-color: #0053f0;
 }
-.form-check-input:focus {
-    border-color: #0053f0;
-    box-shadow: 0 0 0 3px rgba(0,83,240,0.1);
+.input-group-text {
+    background-color: #fff;
+    border-color: #e5e7eb;
 }
-.form-check-label {
-    font-size: 0.9rem;
-    padding-left: 0.5rem;
-}
-.form-check-label a {
-    color: #0053f0;
-}
-.form-check-label a:hover {
-    text-decoration: underline !important;
+.invalid-feedback {
+    font-size: 0.8rem;
 }
 </style>
 {% endblock %}
@@ -141,10 +152,30 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('timezone_offset').value = new Date().getTimezoneOffset();
+    
     const form = document.getElementById('bookingForm');
+    const phoneInput = document.getElementById('visitor_phone');
+    
+    // Validación del teléfono
+    phoneInput.addEventListener('input', function(e) {
+        this.value = this.value.replace(/[^0-9]/g, '');
+        if (this.value.length > 9) {
+            this.value = this.value.slice(0, 9);
+        }
+        
+        if (this.value.length === 9) {
+            this.classList.remove('is-invalid');
+        }
+    });
     
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
+        
+        if (phoneInput.value.length !== 9) {
+            phoneInput.classList.add('is-invalid');
+            return;
+        }
         
         try {
             const response = await fetch('', {
@@ -167,6 +198,5 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Error al procesar la reserva');
         }
     });
-});
-</script>
+});</script>
 {% endblock %}

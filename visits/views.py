@@ -292,12 +292,37 @@ def book_appointment(request, stage_id, slot_id):
 
     if request.method == 'POST':
         try:
-            # Verificar solo si ese slot específico está ocupado
-            if Appointment.objects.filter(
-                staff=slot.staff,  # Solo verificar slots del mismo profesor
-                date__date=slot.date,
-                date__time__range=(slot.start_time, slot.end_time)
-            ).exists():
+            # Debug info
+            print(f"DEBUG - Processing appointment for slot: {slot_id}")
+            print(f"DEBUG - Date: {slot.date}, Start time: {slot.start_time}")
+
+            # Validar teléfono (9 dígitos)
+            phone = request.POST.get('visitor_phone')
+            if not phone.isdigit() or len(phone) != 9:
+                return JsonResponse({
+                    'error': 'El número de teléfono debe contener 9 dígitos'
+                }, status=400)
+
+            # Construir datetime para la cita
+            appointment_datetime = datetime.combine(slot.date, slot.start_time)
+            
+            # Ajustar la zona horaria si se proporciona
+            timezone_offset = request.POST.get('timezone_offset')
+            if timezone_offset:
+                try:
+                    offset_hours = int(timezone_offset) / 60
+                    appointment_datetime = appointment_datetime - timedelta(hours=offset_hours)
+                except (ValueError, TypeError):
+                    print(f"DEBUG - Invalid timezone offset: {timezone_offset}")
+                    pass
+
+            # Verificar disponibilidad del slot
+            appointment_exists = Appointment.objects.filter(
+                staff=slot.staff,
+                date=make_aware(appointment_datetime)
+            ).exists()
+
+            if appointment_exists:
                 return JsonResponse({
                     'error': 'Horario no disponible',
                     'redirect_url': reverse('stage_booking', kwargs={'stage_id': stage_id})
@@ -309,16 +334,21 @@ def book_appointment(request, stage_id, slot_id):
                 staff=slot.staff,
                 visitor_name=request.POST.get('visitor_name'),
                 visitor_email=request.POST.get('visitor_email'),
-                visitor_phone=request.POST.get('visitor_phone'),
-                date=make_aware(datetime.combine(slot.date, slot.start_time))
+                visitor_phone=phone,
+                comments=request.POST.get('comments', ''),
+                date=make_aware(appointment_datetime)
             )
 
+            print(f"DEBUG - Created appointment: {appointment.id}")
+
             # Desactivar slots del mismo profesor
-            AvailabilitySlot.objects.filter(
+            slots_updated = AvailabilitySlot.objects.filter(
                 staff=slot.staff,
                 date=slot.date,
                 start_time=slot.start_time
             ).update(is_active=False)
+
+            print(f"DEBUG - Updated {slots_updated} availability slots")
 
             return JsonResponse({
                 'status': 'success',
@@ -327,7 +357,9 @@ def book_appointment(request, stage_id, slot_id):
             })
 
         except Exception as e:
-            print(f"Error en book_appointment: {str(e)}")
+            print(f"ERROR en book_appointment: {str(e)}")
+            import traceback
+            print(f"DEBUG - Full traceback: {traceback.format_exc()}")
             return JsonResponse({'error': str(e)}, status=500)
 
     context = {
