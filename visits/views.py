@@ -108,30 +108,31 @@ def staff_by_stage(request, stage_id):
 def get_stage_availability(request, stage_id):
     try:
         date_param = request.GET.get('date')
+        print(f"DEBUG - Parámetros recibidos: stage_id={stage_id}, date={date_param}")
+        
         if date_param:
             try:
                 date = datetime.strptime(date_param, '%Y-%m-%d').date()
                 
-                # Filtramos slots con horario comercial
+                # Filtramos slots y verificamos que existan
                 slots = AvailabilitySlot.objects.filter(
                     stage_id=stage_id,
                     date=date,
-                    is_active=True,
-                    start_time__gte=time(8, 0),  # Desde 8:00
-                    start_time__lt=time(20, 0)   # Hasta 20:00
-                ).order_by('start_time')
+                    is_active=True
+                ).select_related('staff', 'staff__user')
+
+                print(f"DEBUG - Query SQL: {slots.query}")
+                print(f"DEBUG - Slots encontrados: {slots.count()}")
                 
-                # Formateamos los slots para la vista
-                formatted_slots = []
+                # Mostramos cada slot para debug
                 for slot in slots:
-                    formatted_slots.append({
-                        'id': slot.id,
-                        'time': slot.start_time.strftime('%H:%M'),
-                        'date': slot.date.isoformat(),
-                        'available': True
-                    })
+                    print(f"DEBUG - Slot: id={slot.id}, date={slot.date}, time={slot.start_time}")
                 
-                return JsonResponse(formatted_slots, safe=False)
+                serializer = AvailabilitySlotSerializer(slots, many=True)
+                data = serializer.data
+                
+                print(f"DEBUG - Datos serializados: {data}")
+                return JsonResponse(data, safe=False)
 
             except ValueError as e:
                 print(f"Error parseando fecha: {e}")
@@ -139,36 +140,30 @@ def get_stage_availability(request, stage_id):
         else:
             # Para vista mensual
             start_date = datetime.now().date()
-            end_date = start_date + timedelta(days=90)  # 3 meses vista
+            end_date = start_date + timedelta(days=90)
             
-            # Obtenemos días con slots disponibles
+            # Obtenemos días con slots
             slots = AvailabilitySlot.objects.filter(
                 stage_id=stage_id,
                 date__range=(start_date, end_date),
-                is_active=True,
-                start_time__gte=time(8, 0),
-                start_time__lt=time(20, 0)
+                is_active=True
             ).values('date').distinct()
             
-            # Formateamos para el calendario
-            available_dates = []
-            for slot in slots:
-                available_dates.append({
-                    'date': slot['date'].isoformat(),
-                    'available': True
-                })
+            print(f"DEBUG - Monthly view - Found dates count: {slots.count()}")
             
+            available_dates = [{
+                'date': slot['date'].isoformat(),
+                'available': True
+            } for slot in slots]
+            
+            print(f"DEBUG - Monthly view - Response data: {available_dates}")
             return JsonResponse(available_dates, safe=False)
-        
+            
     except Exception as e:
-        print(f"Error en get_stage_availability: {str(e)}")
-        return JsonResponse({
-            'error': str(e),
-            'details': {
-                'date_param': date_param if 'date_param' in locals() else None,
-                'stage_id': stage_id
-            }
-        }, status=500)
+        print(f"ERROR en get_stage_availability: {str(e)}")
+        import traceback
+        print(f"DEBUG - Full traceback: {traceback.format_exc()}")
+        return JsonResponse({'error': str(e)}, status=500)
 class StaffAvailabilityView(LoginRequiredMixin, View):
     template_name = 'visits/staff_availability.html'
 

@@ -24,16 +24,24 @@ class AppointmentSerializer(serializers.ModelSerializer):
 class AvailabilitySlotSerializer(serializers.ModelSerializer):
     time = serializers.SerializerMethodField()
     available = serializers.SerializerMethodField()
+    date = serializers.SerializerMethodField()
+    staff_name = serializers.SerializerMethodField()
     
     class Meta:
         model = AvailabilitySlot
-        fields = ['id', 'time', 'available']
+        fields = ['id', 'time', 'date', 'available', 'staff_name']
     
     def get_time(self, obj):
         return obj.start_time.strftime('%H:%M')
+    
+    def get_date(self, obj):
+        return obj.date.isoformat()
         
     def get_available(self, obj):
         return True
+        
+    def get_staff_name(self, obj):
+        return obj.staff.user.get_full_name()
 
 class CalendarDaySerializer(serializers.Serializer):
     date = serializers.DateField()
@@ -46,7 +54,6 @@ class CalendarDaySerializer(serializers.Serializer):
         return data
 
 class SlotDetailSerializer(serializers.ModelSerializer):
-    """Serializer para los detalles del slot cuando se selecciona uno"""
     staff_name = serializers.SerializerMethodField()
     time = serializers.SerializerMethodField()
     date = serializers.SerializerMethodField()
