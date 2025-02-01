@@ -1,4 +1,3 @@
-<!-- templates/visits/staff_availability.html -->
 {% extends 'base.html' %}
 
 {% block extra_css %}
@@ -37,29 +36,13 @@
                            <div class="col-md-3">
                                <label class="form-label">Hora inicio</label>
                                <select name="start_time" class="form-select" required>
-                                   <option value="00:00">00:00</option>
-                                   <option value="00:15">00:15</option>
-                                   <option value="00:30">00:30</option>
-                                   <option value="00:45">00:45</option>
-                                   <!-- Repetir para cada hora -->
-                                   <option value="23:00">23:00</option>
-                                   <option value="23:15">23:15</option>
-                                   <option value="23:30">23:30</option>
-                                   <option value="23:45">23:45</option>
+                                   <!-- Se generará dinámicamente -->
                                </select>
                            </div>
                            <div class="col-md-3">
                                <label class="form-label">Hora fin</label>
                                <select name="end_time" class="form-select" required>
-                                   <option value="00:00">00:00</option>
-                                   <option value="00:15">00:15</option>
-                                   <option value="00:30">00:30</option>
-                                   <option value="00:45">00:45</option>
-                                   <!-- Repetir para cada hora -->
-                                   <option value="23:00">23:00</option>
-                                   <option value="23:15">23:15</option>
-                                   <option value="23:30">23:30</option>
-                                   <option value="23:45">23:45</option>
+                                   <!-- Se generará dinámicamente -->
                                </select>
                            </div>
                            <div class="col-md-3">
@@ -119,29 +102,13 @@
                            <div class="col-md-2">
                                <label class="form-label">Hora inicio</label>
                                <select name="start_time" class="form-select" required>
-                                   <option value="00:00">00:00</option>
-                                   <option value="00:15">00:15</option>
-                                   <option value="00:30">00:30</option>
-                                   <option value="00:45">00:45</option>
-                                   <!-- Repetir para cada hora -->
-                                   <option value="23:00">23:00</option>
-                                   <option value="23:15">23:15</option>
-                                   <option value="23:30">23:30</option>
-                                   <option value="23:45">23:45</option>
+                                   <!-- Se generará dinámicamente -->
                                </select>
                            </div>
                            <div class="col-md-2">
                                <label class="form-label">Hora fin</label>
                                <select name="end_time" class="form-select" required>
-                                   <option value="00:00">00:00</option>
-                                   <option value="00:15">00:15</option>
-                                   <option value="00:30">00:30</option>
-                                   <option value="00:45">00:45</option>
-                                   <!-- Repetir para cada hora -->
-                                   <option value="23:00">23:00</option>
-                                   <option value="23:15">23:15</option>
-                                   <option value="23:30">23:30</option>
-                                   <option value="23:45">23:45</option>
+                                   <!-- Se generará dinámicamente -->
                                </select>
                            </div>
                            <div class="col-md-2">
@@ -186,98 +153,145 @@
 <script>
 // Función para generar las opciones de hora
 function generateTimeOptions() {
-   const selects = document.querySelectorAll('select[name="start_time"], select[name="end_time"]');
-   selects.forEach(select => {
-       for(let hour = 0; hour < 24; hour++) {
-           for(let min of [0, 15, 30, 45]) {
-               const time = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
-               const option = new Option(time, time);
-               select.appendChild(option);
-           }
-       }
-   });
+    const selects = document.querySelectorAll('select[name="start_time"], select[name="end_time"]');
+    selects.forEach(select => {
+        select.innerHTML = ''; // Limpiar opciones existentes
+        
+        // Generar opciones de 8:00 a 20:00
+        for(let hour = 8; hour <= 20; hour++) {
+            for(let min of [0, 15, 30, 45]) {
+                // No incluir 20:15, 20:30, 20:45
+                if (hour === 20 && min > 0) continue;
+                
+                const time = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
+                const option = new Option(time, time);
+                select.appendChild(option);
+            }
+        }
+    });
 }
 
 $(document).ready(function() {
-   // Generar opciones de hora
-   generateTimeOptions();
+    // Generar opciones de hora
+    generateTimeOptions();
 
-   const table = $('#slots-table').DataTable({
-       data: {{ slots_json|safe }},
-       columns: [
-           { data: 'date' },
-           { 
-               data: null,
-               render: function(data) {
-                   return `${data.start_time} - ${data.end_time}`;
-               }
-           },
-           { data: 'duration', render: d => d + ' min' },
-           {
-               data: 'id',
-               render: function(id) {
-                   return `<button onclick="deleteSlot(${id})" class="btn btn-danger btn-sm">Eliminar</button>`;
-               }
-           }
-       ],
-       order: [[0, 'asc'], [1, 'asc']],
-       language: {
-           url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json'
-       }
-   });
+    // Inicializar DataTable
+    const table = $('#slots-table').DataTable({
+        data: {{ slots_json|safe }},
+        columns: [
+            { data: 'date' },
+            { 
+                data: null,
+                render: function(data) {
+                    return `${data.start_time} - ${data.end_time}`;
+                }
+            },
+            { data: 'duration', render: d => d + ' min' },
+            {
+                data: 'id',
+                render: function(id) {
+                    return `<button onclick="deleteSlot(${id})" class="btn btn-danger btn-sm">Eliminar</button>`;
+                }
+            }
+        ],
+        order: [[0, 'asc'], [1, 'asc']],
+        language: {
+            url: 'https://cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json',
+            decimal: ',',
+            thousands: '.'
+        }
+    });
 
-   function handleFormSubmit(formId) {
-       $(`#${formId}`).on('submit', async function(e) {
-           e.preventDefault();
-           const formData = new FormData(this);
+    // Validación de horas
+    function validateTimeRange(form) {
+        const startTime = form.querySelector('[name="start_time"]').value;
+        const endTime = form.querySelector('[name="end_time"]').value;
+        
+        if (startTime >= endTime) {
+            alert('La hora de fin debe ser posterior a la hora de inicio');
+            return false;
+        }
+        return true;
+    }
 
-           try {
-               const response = await fetch('/availability/', {
-                   method: 'POST',
-                   body: formData,
-                   headers: {
-                       'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                   }
-               });
+    // Manejar envío de formularios
+    function handleFormSubmit(formId) {
+        $(`#${formId}`).on('submit', async function(e) {
+            e.preventDefault();
+            
+            if (!validateTimeRange(this)) {
+                return;
+            }
 
-               if (!response.ok) {
-                   const error = await response.json();
-                   throw new Error(error.error || 'Error al guardar');
-               }
+            const formData = new FormData(this);
 
-               const data = await response.json();
-               if (data.slots) {
-                   data.slots.forEach(slot => table.row.add(slot).draw());
-               }
-               this.reset();
-           } catch (error) {
-               alert(error.message);
-               console.error('Error:', error);
-           }
-       });
-   }
+            try {
+                const response = await fetch('/availability/', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    }
+                });
 
-   handleFormSubmit('single-form');
-   handleFormSubmit('recurring-form');
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Error al guardar');
+                }
+
+                const data = await response.json();
+                if (data.slots) {
+                    data.slots.forEach(slot => table.row.add(slot).draw());
+                }
+                this.reset();
+                generateTimeOptions(); // Regenerar opciones después del reset
+            } catch (error) {
+                alert(error.message);
+                console.error('Error:', error);
+            }
+        });
+    }
+
+    handleFormSubmit('single-form');
+    handleFormSubmit('recurring-form');
+
+    // Validación adicional para formulario recurrente
+    $('#recurring-form select[name="month"]').on('change', function() {
+        const selectedMonth = parseInt(this.value);
+        const currentMonth = new Date().getMonth() + 1;
+        
+        if (selectedMonth < currentMonth) {
+            alert('No se pueden crear slots para meses pasados');
+            this.value = currentMonth;
+        }
+    });
 });
 
-function deleteSlot(id) {
-   if (confirm('¿Confirmas eliminar esta disponibilidad?')) {
-       fetch(`/api/availability/${id}/`, {
-           method: 'DELETE',
-           headers: {
-               'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-           }
-       })
-       .then(response => {
-           if (response.ok) {
-               $('#slots-table').DataTable()
-                   .row($(`button[onclick="deleteSlot(${id})"]`).closest('tr'))
-                   .remove()
-                   .draw();
-           }
-       });
-   }
+// Función para eliminar slot
+async function deleteSlot(id) {
+    if (confirm('¿Confirmas eliminar esta disponibilidad?')) {
+        try {
+            const response = await fetch(`/api/availability/${id}/`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Error al eliminar el slot');
+            }
+            
+            $('#slots-table').DataTable()
+                .row($(`button[onclick="deleteSlot(${id})"]`).closest('tr'))
+                .remove()
+                .draw();
+                
+        } catch (error) {
+            alert('Error al eliminar el slot: ' + error.message);
+            console.error('Error:', error);
+        }
+    }
 }
 </script>
 {% endblock %}

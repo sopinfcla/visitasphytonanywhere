@@ -5,6 +5,9 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import make_aware
 from datetime import datetime, timedelta, time
 import calendar
+import logging
+
+logger = logging.getLogger(__name__)
 
 class SchoolStage(models.Model):
     name = models.CharField(max_length=100)
@@ -20,6 +23,30 @@ class StaffProfile(models.Model):
     def __str__(self):
         return self.user.get_full_name()
 
+    def has_overlapping_slots(self, date, start_time, end_time, exclude_id=None):
+        """Verifica si hay slots solapados para este staff"""
+        overlapping = AvailabilitySlot.objects.filter(
+            staff=self,
+            date=date,
+            is_active=True
+        ).exclude(id=exclude_id)
+
+        for slot in overlapping:
+            if (start_time < slot.end_time and end_time > slot.start_time):
+                return True
+        return False
+
+    def has_appointments_in_timeframe(self, date, start_time, end_time):
+        """Verifica si hay citas en el rango de tiempo especificado"""
+        start_datetime = make_aware(datetime.combine(date, start_time))
+        end_datetime = make_aware(datetime.combine(date, end_time))
+        
+        return Appointment.objects.filter(
+            staff=self,
+            date__gte=start_datetime,
+            date__lt=end_datetime
+        ).exists()
+
 class Appointment(models.Model):
     stage = models.ForeignKey(SchoolStage, on_delete=models.CASCADE)
     staff = models.ForeignKey(StaffProfile, on_delete=models.CASCADE)
@@ -28,16 +55,40 @@ class Appointment(models.Model):
     visitor_phone = models.CharField(max_length=20)
     date = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
-    comments = models.TextField(blank=True, null=True)  # Nuevo campo añadido
+    comments = models.TextField(blank=True, null=True)
 
     class Meta:
         ordering = ['-date']
+        indexes = [
+            models.Index(fields=['date']),
+            models.Index(fields=['staff', 'date']),
+        ]
 
     def clean(self):
-        if self.staff and self.stage and self.stage not in self.staff.allowed_stages.all():
-            raise ValidationError({
-                'staff': _('Este miembro del staff no puede atender citas de esta etapa.')
-            })
+        if not self.pk:  # Solo para nuevas citas
+            # Validar etapa asignada al staff
+            if self.staff and self.stage and self.stage not in self.staff.allowed_stages.all():
+                raise ValidationError({
+                    'staff': _('Este miembro del staff no puede atender citas de esta etapa.')
+                })
+
+            # Validar solapamiento con otras citas
+            appointment_date = self.date.date()
+            appointment_time = self.date.time()
+            end_time = (datetime.combine(appointment_date, appointment_time) + 
+                       timedelta(minutes=30)).time()
+
+            if self.staff.has_appointments_in_timeframe(
+                appointment_date, appointment_time, end_time):
+                raise ValidationError(_('Ya existe una cita en este horario.'))
+
+            # Validar formato de teléfono
+            if not self.visitor_phone.isdigit() or len(self.visitor_phone) != 9:
+                raise ValidationError({
+                    'visitor_phone': _('El teléfono debe contener exactamente 9 dígitos.')
+                })
+
+            logger.info(f"Nueva cita validada para {self.visitor_name} el {self.date}")
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -72,11 +123,20 @@ class AvailabilitySlot(models.Model):
         ]
 
     def clean(self):
+        # Validar horario permitido (8:00 - 20:00)
+        min_time = time(8, 0)
+        max_time = time(20, 0)
+        
+        if self.start_time < min_time or self.end_time > max_time:
+            raise ValidationError(_('Los horarios deben estar entre 8:00 y 20:00'))
+
         # Validación para slots no recurrentes
         if self.repeat_type == 'once':
             if not self.date:
                 raise ValidationError({'date': 'La fecha es requerida para slots no recurrentes'})
-            # Establecer month y weekday a None para evitar confusiones
+            # Validar que la fecha no sea pasada
+            if self.date < datetime.now().date():
+                raise ValidationError({'date': 'No se pueden crear slots para fechas pasadas'})
             self.month = None
             self.weekday = None
         
@@ -87,7 +147,10 @@ class AvailabilitySlot(models.Model):
                     'month': 'Mes requerido para slots semanales',
                     'weekday': 'Día de la semana requerido para slots semanales'
                 })
-            # Establecer date a None para slots semanales
+            # Validar mes actual o futuro
+            current_month = datetime.now().month
+            if self.month < current_month:
+                raise ValidationError({'month': 'No se pueden crear slots para meses pasados'})
             self.date = None
         
         # Validaciones comunes
@@ -99,6 +162,16 @@ class AvailabilitySlot(models.Model):
         
         if self.stage not in self.staff.allowed_stages.all():
             raise ValidationError({'stage': 'Este miembro del staff no puede atender esta etapa'})
+
+        # Validar solapamientos
+        if self.repeat_type == 'once' and self.date:
+            if self.staff.has_overlapping_slots(self.date, self.start_time, self.end_time, self.pk):
+                raise ValidationError(_('Ya existe un slot en este horario'))
+
+            if self.staff.has_appointments_in_timeframe(self.date, self.start_time, self.end_time):
+                raise ValidationError(_('Ya existe una cita programada en este horario'))
+
+        logger.info(f"Slot validado para {self.staff} el {self.date or 'recurrente'}")
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -127,7 +200,7 @@ class AvailabilitySlot(models.Model):
 
     def generate_slots(self):
         """Genera slots individuales basados en este template"""
-        print(f"Generating slots - type: {self.repeat_type}, date: {self.date}, time: {self.start_time}-{self.end_time}")
+        logger.info(f"Generando slots - tipo: {self.repeat_type}, fecha: {self.date}, hora: {self.start_time}-{self.end_time}")
         if self.repeat_type == 'once':
             return self._generate_day_slots()
         return self._generate_monthly_slots()
@@ -154,7 +227,7 @@ class AvailabilitySlot(models.Model):
             slots.append(slot)
             current_time = next_time.time()
         
-        print(f"Generated {len(slots)} day slots")
+        logger.info(f"Generados {len(slots)} slots diarios")
         return slots
 
     def _generate_monthly_slots(self):
@@ -186,7 +259,7 @@ class AvailabilitySlot(models.Model):
                         slots.append(slot)
                         current_time = next_time.time()
         
-        print(f"Generated {len(slots)} monthly slots")
+        logger.info(f"Generados {len(slots)} slots mensuales")
         return slots
 
     def __str__(self):

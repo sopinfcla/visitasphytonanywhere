@@ -48,7 +48,6 @@
                     <h4 class="mb-4">Introduce tus datos</h4>
                     <form id="bookingForm" method="POST">
                         {% csrf_token %}
-                        <input type="hidden" name="timezone_offset" id="timezone_offset">
                         
                         <div class="mb-3">
                             <label for="visitor_name" class="form-label">NOMBRE COMPLETO</label>
@@ -68,10 +67,12 @@
                                 </span>
                                 <input type="tel" class="form-control" 
                                        id="visitor_phone" name="visitor_phone" 
+                                       pattern="[0-9]{9}"
+                                       maxlength="9"
                                        required>
                             </div>
                             <div class="invalid-feedback">
-                                El teléfono debe tener 9 dígitos
+                                El teléfono debe tener exactamente 9 dígitos
                             </div>
                         </div>
 
@@ -152,26 +153,33 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('timezone_offset').value = new Date().getTimezoneOffset();
-    
     const form = document.getElementById('bookingForm');
     const phoneInput = document.getElementById('visitor_phone');
     
     // Validación del teléfono
     phoneInput.addEventListener('input', function(e) {
+        // Solo permitir números
         this.value = this.value.replace(/[^0-9]/g, '');
+        
+        // Limitar a 9 dígitos
         if (this.value.length > 9) {
             this.value = this.value.slice(0, 9);
         }
         
+        // Validación visual
         if (this.value.length === 9) {
             this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        } else {
+            this.classList.remove('is-valid');
+            this.classList.add('is-invalid');
         }
     });
     
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
         
+        // Validar teléfono antes de enviar
         if (phoneInput.value.length !== 9) {
             phoneInput.classList.add('is-invalid');
             return;
