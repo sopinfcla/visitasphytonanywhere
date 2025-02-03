@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -86,3 +87,50 @@ STATICFILES_DIRS = [
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 LOGOUT_REDIRECT_URL = '/'  # Redirige a la página principal después del logout
+
+
+
+# Ejemplo de configuración de logging en settings.py
+LOGGING = {
+    'version': 1,  # Versión del diccionario de configuración de logging
+    'disable_existing_loggers': False,  # Permite que se usen también los loggers existentes de Django
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '[{levelname}] {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {  # Handler para imprimir en consola
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',  # Puedes usar 'simple' si prefieres un formato más sencillo
+        },
+        # Opcional: Handler para escribir en un archivo de log
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(Path(__file__).resolve().parent, 'django.log'),
+            'formatter': 'verbose',
+        },
+    },
+    'root': {  # Logger raíz: afecta a todos los mensajes de log
+        'handlers': ['console', 'file'],  # O solo 'console' si no deseas escribir en archivo
+        'level': 'DEBUG',  # Ajusta el nivel (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    },
+    'loggers': {
+        'django': {  # Logger para los mensajes internos de Django
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        # Logger para tus módulos, por ejemplo, si tu app se llama "visits"
+        'visits': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}

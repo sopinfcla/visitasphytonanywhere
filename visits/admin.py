@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils import timezone
 from django.utils.html import format_html
 from .models import SchoolStage, StaffProfile, Appointment, AvailabilitySlot
 
@@ -39,7 +40,9 @@ class AppointmentAdmin(admin.ModelAdmin):
     readonly_fields = ['created_at']
     
     def formatted_date(self, obj):
-        return obj.date.strftime("%d/%m/%Y %H:%M")
+        # Convertir la hora de la cita a la zona horaria local configurada (por ejemplo, Europe/Madrid)
+        local_dt = timezone.localtime(obj.date)
+        return local_dt.strftime("%d/%m/%Y %H:%M")
     formatted_date.short_description = 'Fecha y hora'
 
 @admin.register(AvailabilitySlot)
@@ -77,16 +80,13 @@ class AvailabilitySlotAdmin(admin.ModelAdmin):
     
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
-        if obj is None:  # Solo para nuevos slots
+        if obj is None:  # Para nuevos slots
             if request.user.is_superuser:
                 return form
-                
-            # Filtrar por el staff del usuario actual
             try:
                 staff_profile = StaffProfile.objects.get(user=request.user)
                 form.base_fields['staff'].initial = staff_profile
                 form.base_fields['staff'].disabled = True
-                # Filtrar etapas permitidas
                 form.base_fields['stage'].queryset = staff_profile.allowed_stages.all()
             except StaffProfile.DoesNotExist:
                 pass
@@ -95,11 +95,9 @@ class AvailabilitySlotAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         if not obj or request.user.is_superuser:
             return True
-        # Solo permitir editar slots propios
         return obj.staff.user == request.user
     
     def has_delete_permission(self, request, obj=None):
         if not obj or request.user.is_superuser:
             return True
-        # Solo permitir eliminar slots propios
         return obj.staff.user == request.user

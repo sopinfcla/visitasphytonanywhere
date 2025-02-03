@@ -1,0 +1,44 @@
+DEBUG 2025-02-03 14:39:02,505 views 31824 15116 Parámetros recibidos: stage_id=2, date=None
+DEBUG 2025-02-03 14:39:02,509 views 31824 15116 Vista mensual - Fechas encontradas: 0
+DEBUG 2025-02-03 14:39:26,272 views 31824 15116 Parámetros recibidos: stage_id=1, date=None
+DEBUG 2025-02-03 14:39:26,274 views 31824 15116 Vista mensual - Fechas encontradas: 0
+INFO 2025-02-03 14:39:39,231 views 31824 15116 Iniciando creación de slots para Alicia Rodrigo de Diego
+INFO 2025-02-03 14:39:39,248 views 31824 15116 Creando slots para las etapas: ['Escuela Infantil', 'Infantil', 'Primaria', 'Secundaria', 'Bachillerato']
+INFO 2025-02-03 14:39:39,255 models 31824 15116 Verificando solapamientos para Alicia Rodrigo de Diego el 2025-02-04 de 08:00:00 a 09:30:00
+INFO 2025-02-03 14:39:39,260 models 31824 15116 No se encontraron solapamientos
+INFO 2025-02-03 14:39:39,263 models 31824 15116 Generando slots - tipo: once, fecha: 2025-02-04, hora: 08:00:00-09:30:00
+INFO 2025-02-03 14:39:39,264 models 31824 15116 Generados 2 slots para Alicia Rodrigo de Diego el 2025-02-04 entre 08:00:00 y 09:30:00
+INFO 2025-02-03 14:39:39,277 views 31824 15116 Creados 2 slots para etapa Escuela Infantil
+INFO 2025-02-03 14:39:39,278 models 31824 15116 Generando slots - tipo: once, fecha: 2025-02-04, hora: 08:00:00-09:30:00
+INFO 2025-02-03 14:39:39,280 models 31824 15116 Generados 2 slots para Alicia Rodrigo de Diego el 2025-02-04 entre 08:00:00 y 09:30:00
+INFO 2025-02-03 14:39:39,289 views 31824 15116 Creados 2 slots para etapa Infantil
+INFO 2025-02-03 14:39:39,291 models 31824 15116 Generando slots - tipo: once, fecha: 2025-02-04, hora: 08:00:00-09:30:00
+INFO 2025-02-03 14:39:39,292 models 31824 15116 Generados 2 slots para Alicia Rodrigo de Diego el 2025-02-04 entre 08:00:00 y 09:30:00
+INFO 2025-02-03 14:39:39,302 views 31824 15116 Creados 2 slots para etapa Primaria
+INFO 2025-02-03 14:39:39,303 models 31824 15116 Generando slots - tipo: once, fecha: 2025-02-04, hora: 08:00:00-09:30:00
+INFO 2025-02-03 14:39:39,304 models 31824 15116 Generados 2 slots para Alicia Rodrigo de Diego el 2025-02-04 entre 08:00:00 y 09:30:00
+INFO 2025-02-03 14:39:39,316 views 31824 15116 Creados 2 slots para etapa Secundaria
+INFO 2025-02-03 14:39:39,317 models 31824 15116 Generando slots - tipo: once, fecha: 2025-02-04, hora: 08:00:00-09:30:00
+INFO 2025-02-03 14:39:39,318 models 31824 15116 Generados 2 slots para Alicia Rodrigo de Diego el 2025-02-04 entre 08:00:00 y 09:30:00
+INFO 2025-02-03 14:39:39,329 views 31824 15116 Creados 2 slots para etapa Bachillerato
+INFO 2025-02-03 14:39:39,330 views 31824 15116 Total de slots creados: 10
+INFO 2025-02-03 14:39:50,015 views 31824 15116 Iniciando creación de slots para Alicia Rodrigo de Diego
+INFO 2025-02-03 14:39:50,019 views 31824 15116 Creando slots para las etapas: ['Escuela Infantil', 'Infantil', 'Primaria', 'Secundaria', 'Bachillerato']
+INFO 2025-02-03 14:39:50,020 models 31824 15116 Verificando solapamientos para Alicia Rodrigo de Diego el 2025-02-04 de 08:00:00 a 09:30:00
+INFO 2025-02-03 14:39:50,024 models 31824 15116 No se encontraron solapamientos
+INFO 2025-02-03 14:39:50,027 models 31824 15116 Generando slots - tipo: once, fecha: 2025-02-04, hora: 08:00:00-09:30:00
+INFO 2025-02-03 14:39:50,027 models 31824 15116 Generados 2 slots para Alicia Rodrigo de Diego el 2025-02-04 entre 08:00:00 y 09:30:00
+INFO 2025-02-03 14:39:50,047 views 31824 15116 Creados 2 slots para etapa Escuela Infantil
+INFO 2025-02-03 14:39:50,048 models 31824 15116 Generando slots - tipo: once, fecha: 2025-02-04, hora: 08:00:00-09:30:00
+INFO 2025-02-03 14:39:50,050 models 31824 15116 Generados 2 slots para Alicia Rodrigo de Diego el 2025-02-04 entre 08:00:00 y 09:30:00
+INFO 2025-02-03 14:39:50,061 views 31824 15116 Creados 2 slots para etapa Infantil
+INFO 2025-02-03 14:39:50,062 models 31824 15116 Generando slots - tipo: once, fecha: 2025-02-04, hora: 08:00:00-09:30:00
+INFO 2025-02-03 14:39:50,063 models 31824 15116 Generados 2 slots para Alicia Rodrigo de Diego el 2025-02-04 entre 08:00:00 y 09:30:00
+INFO 2025-02-03 14:39:50,073 views 31824 15116 Creados 2 slots para etapa Primaria
+INFO 2025-02-03 14:39:50,074 models 31824 15116 Generando slots - tipo: once, fecha: 2025-02-04, hora: 08:00:00-09:30:00
+INFO 2025-02-03 14:39:50,075 models 31824 15116 Generados 2 slots para Alicia Rodrigo de Diego el 2025-02-04 entre 08:00:00 y 09:30:00
+INFO 2025-02-03 14:39:50,085 views 31824 15116 Creados 2 slots para etapa Secundaria
+INFO 2025-02-03 14:39:50,086 models 31824 15116 Generando slots - tipo: once, fecha: 2025-02-04, hora: 08:00:00-09:30:00
+INFO 2025-02-03 14:39:50,087 models 31824 15116 Generados 2 slots para Alicia Rodrigo de Diego el 2025-02-04 entre 08:00:00 y 09:30:00
+INFO 2025-02-03 14:39:50,097 views 31824 15116 Creados 2 slots para etapa Bachillerato
+INFO 2025-02-03 14:39:50,098 views 31824 15116 Total de slots creados: 10
