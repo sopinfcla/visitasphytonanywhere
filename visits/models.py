@@ -213,31 +213,38 @@ class AvailabilitySlot(models.Model):
         return available
     
     def generate_slots(self):
+        """
+        Genera slots a partir de la disponibilidad base.
+        Para slots no recurrentes, genera slots en intervalos de 15 minutos.
+        Para slots recurrentes, genera slots para todas las ocurrencias del mes.
+        """
         logger.info(f"Generando slots para el profesor {self.staff} con tipo de repetición '{self.repeat_type}'")
         if self.repeat_type == 'once':
             return self._generate_day_slots()
         return self._generate_monthly_slots()
-    
+
     def _generate_day_slots(self):
         """
-        Genera slots a partir de la disponibilidad diaria utilizando un paso.
-        Por ejemplo, para una disponibilidad de 8:00 a 9:30 y reuniones de 60 minutos,
-        se generan dos slots:
-          - 8:00 a 9:00
-          - 8:30 a 9:30
-        Si ya existe una cita programada para alguno de esos intervalos, ese slot no se generará.
+        Genera slots individuales para un día específico con intervalos de 15 minutos
+        y asegurando que cada slot tenga espacio para la duración completa.
         """
         slots = []
-        step = timedelta(minutes=self.duration // 2)
         current_dt = datetime.combine(self.date, self.start_time)
         end_dt = datetime.combine(self.date, self.end_time)
+        
+        # Redondear al próximo intervalo de 15 minutos si es necesario
+        minutes = current_dt.minute
+        if minutes % 15 != 0:
+            minutes = ((minutes // 15) + 1) * 15
+            current_dt = current_dt.replace(minute=minutes)
+        
+        # Generar slots mientras haya espacio para la duración completa
         while current_dt + timedelta(minutes=self.duration) <= end_dt:
             slot_start = current_dt.time()
             slot_end = (current_dt + timedelta(minutes=self.duration)).time()
+            
             # Verificar si existe una cita programada en este intervalo
-            if self.staff.has_appointments_in_timeframe(self.date, slot_start, slot_end):
-                logger.info(f"No se genera slot de {slot_start} a {slot_end} en {self.date} porque ya hay una cita programada")
-            else:
+            if not self.staff.has_appointments_in_timeframe(self.date, slot_start, slot_end):
                 slot = AvailabilitySlot(
                     staff=self.staff,
                     stage=self.stage,
@@ -250,27 +257,39 @@ class AvailabilitySlot(models.Model):
                 )
                 slots.append(slot)
                 logger.debug(f"Slot generado: {slot_start} – {slot_end} para {self.date}")
-            current_dt += step
+            
+            # Avanzar 15 minutos
+            current_dt += timedelta(minutes=15)
+        
         logger.info(f"Generados {len(slots)} slots diarios para {self.date}")
         return slots
-    
+
     def _generate_monthly_slots(self):
+        """
+        Genera slots para todas las ocurrencias del día de la semana especificado en el mes.
+        """
         slots = []
         year = datetime.now().year
         c = calendar.monthcalendar(year, self.month)
+        
         for week in c:
             if week[self.weekday] != 0:
                 date_obj = datetime(year, self.month, week[self.weekday]).date()
                 if date_obj >= datetime.now().date():
                     current_dt = datetime.combine(date_obj, self.start_time)
                     end_dt = datetime.combine(date_obj, self.end_time)
-                    step = timedelta(minutes=self.duration // 2)
+                    
+                    # Redondear al próximo intervalo de 15 minutos
+                    minutes = current_dt.minute
+                    if minutes % 15 != 0:
+                        minutes = ((minutes // 15) + 1) * 15
+                        current_dt = current_dt.replace(minute=minutes)
+                    
                     while current_dt + timedelta(minutes=self.duration) <= end_dt:
                         slot_start = current_dt.time()
                         slot_end = (current_dt + timedelta(minutes=self.duration)).time()
-                        if self.staff.has_appointments_in_timeframe(date_obj, slot_start, slot_end):
-                            logger.info(f"No se genera slot de {slot_start} a {slot_end} en {date_obj} porque ya hay una cita programada")
-                        else:
+                        
+                        if not self.staff.has_appointments_in_timeframe(date_obj, slot_start, slot_end):
                             slot = AvailabilitySlot(
                                 staff=self.staff,
                                 stage=self.stage,
@@ -282,11 +301,38 @@ class AvailabilitySlot(models.Model):
                                 repeat_type='once'
                             )
                             slots.append(slot)
-                        current_dt += step
+                        current_dt += timedelta(minutes=15)
+        
         logger.info(f"Generados {len(slots)} slots mensuales para el mes {self.month} en el día de la semana {self.weekday}")
         return slots
-    
+        
     def __str__(self):
         if self.date:
             return f"{self.staff} - {self.date} {self.start_time}"
         return f"{self.staff} - {calendar.day_name[self.weekday]} {self.start_time}"
+
+    @classmethod
+    def cleanup_old_slots(cls):
+        """
+        Elimina los slots de fechas pasadas que no tienen citas asignadas.
+        Se ejecuta automáticamente al iniciar la aplicación.
+        """
+        today = datetime.now().date()
+        
+        # Identificar slots antiguos sin citas
+        old_slots = cls.objects.filter(
+            date__lt=today,
+            is_active=True
+        ).exclude(
+            date__in=Appointment.objects.filter(
+                date__date__lt=today
+            ).values('date__date')
+        )
+        
+        # Registrar y eliminar
+        count = old_slots.count()
+        if count > 0:
+            logger.info(f"Limpiando {count} slots antiguos sin citas asignadas")
+            old_slots.delete()
+        
+        return count

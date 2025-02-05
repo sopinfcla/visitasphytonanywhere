@@ -73,11 +73,12 @@
 
 {% block extra_css %}
 <style>
+/* 1. Base Container */
 .container-fluid {
     max-width: 1200px;
 }
 
-/* FullCalendar overrides */
+/* 2. FullCalendar Overrides */
 .fc {
     --fc-border-color: transparent;
     --fc-day-today-bg-color: transparent;
@@ -157,7 +158,7 @@
     color: white !important;
 }
 
-/* Navegación */
+/* 3. Navigation */
 .nav-btn {
     padding: 0.4rem 0.6rem;
     color: #666;
@@ -172,7 +173,7 @@
     border-color: #0969da;
 }
 
-/* Time Slots Column */
+/* 4. Time Slots Column */
 #timeSlotsColumn {
     display: none;
 }
@@ -193,6 +194,7 @@
     }
 }
 
+/* 5. Timezone Info */
 .timezone-info {
     display: flex;
     align-items: center;
@@ -212,6 +214,7 @@
     padding-right: 1rem;
 }
 
+/* 6. Slots Container */
 #slots-container .btn {
     color: #0969da;
     background: white;
@@ -239,7 +242,7 @@
     color: #666;
 }
 
-/* Loading States */
+/* 7. Loading States */
 .loading-spinner {
     width: 24px;
     height: 24px;
@@ -274,6 +277,7 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // 1. Inicialización y configuración básica
     console.log('DEBUG - Page loaded');
     
     const monthNames = [
@@ -281,6 +285,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
     ];
 
+    // 2. Configuración del calendario
     const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
         initialView: 'dayGridMonth',
         locale: 'es',
@@ -304,20 +309,38 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         select: function(info) {
             console.log('DEBUG - Date selected:', info.startStr);
-            handleDateSelection(info);
+            // No hacemos nada aquí para evitar duplicación
         },
         dateClick: function(info) {
             console.log('DEBUG - Date clicked:', info.dateStr);
+            const clickedDay = document.querySelector(`.fc-day[data-date="${info.dateStr}"]`);
+            if (clickedDay && clickedDay.classList.contains('fc-day-has-slots')) {
+                handleDateSelection({ startStr: info.dateStr });
+            }
+        },
+        eventDidMount: function(info) {
+            // Si es el día actual y tiene slots, cargarlos
+            const today = new Date().toISOString().split('T')[0];
+            if (info.event.startStr === today) {
+                const todayCell = document.querySelector(`.fc-day[data-date="${today}"]`);
+                if (todayCell && todayCell.classList.contains('fc-day-has-slots')) {
+                    handleDateSelection({ startStr: today });
+                }
+            }
         }
     });
     
+    // 3. Inicialización del calendario
     calendar.render();
     
-    // Botones de navegación
+    // 4. Navegación del calendario
     document.getElementById('prevMonth').onclick = () => calendar.prev();
     document.getElementById('nextMonth').onclick = () => calendar.next();
     
-    // Cargar días disponibles
+    // 5. Variable de control para cargas múltiples
+    let currentlyLoadingDate = null;
+
+    // 6. Función para cargar días disponibles
     async function loadAvailableDates() {
         console.log('DEBUG - Loading available dates');
         try {
@@ -340,14 +363,39 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('DEBUG - Marked date as available:', dateInfo.date);
                 }
             });
+
+            // Manejar día actual solo si estamos en el mes actual
+            const today = new Date().toISOString().split('T')[0];
+            const currentMonth = calendar.view.currentStart;
+            const nextMonth = new Date(currentMonth);
+            nextMonth.setMonth(nextMonth.getMonth() + 1);
+            
+            const todayDate = new Date(today);
+            if (todayDate >= currentMonth && todayDate < nextMonth) {
+                const todayCell = document.querySelector(`.fc-day[data-date="${today}"]`);
+                if (todayCell && todayCell.classList.contains('fc-day-has-slots')) {
+                    handleDateSelection({ startStr: today });
+                }
+            }
+            
         } catch (error) {
             console.error('DEBUG - Error loading dates:', error);
         }
     }
     
-    // Cargar slots para un día específico
+    // 7. Función para cargar slots de un día específico
     async function loadTimeSlots(date) {
-        console.log('DEBUG - Loading time slots for date:', date);
+        const formattedDate = date.toISOString().split('T')[0];
+        
+        // Prevenir múltiples cargas simultáneas para la misma fecha
+        if (currentlyLoadingDate === formattedDate) {
+            console.log('DEBUG - Already loading slots for:', formattedDate);
+            return;
+        }
+        
+        currentlyLoadingDate = formattedDate;
+        console.log('DEBUG - Loading time slots for date:', formattedDate);
+        
         const container = document.getElementById('slots-container');
         const timeSlotsColumn = document.getElementById('timeSlotsColumn');
         
@@ -356,9 +404,6 @@ document.addEventListener('DOMContentLoaded', function() {
         timeSlotsColumn.style.display = 'block';
         
         try {
-            const formattedDate = date.toISOString().split('T')[0];
-            console.log('DEBUG - Formatted date:', formattedDate);
-            
             const url = `/api/stage/{{ stage.id }}/availability/?date=${formattedDate}`;
             console.log('DEBUG - Fetching URL:', url);
             
@@ -401,10 +446,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     <i class="fas fa-exclamation-circle"></i>
                     <p>Error cargando horarios</p>
                 </div>`;
+        } finally {
+            currentlyLoadingDate = null;
         }
     }
     
-    // Manejar selección de fecha
+    // 8. Función para manejar la selección de fecha
     function handleDateSelection(info) {
         console.log('DEBUG - Handling date selection:', info);
         
