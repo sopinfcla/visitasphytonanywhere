@@ -1,3 +1,7 @@
+# ====================================
+# Part 1: Imports and Base Functions
+# ====================================
+
 from django.shortcuts import render, get_object_or_404
 from django.views.generic import TemplateView, View
 from rest_framework import viewsets
@@ -6,6 +10,7 @@ from datetime import datetime, timedelta, time
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils.timezone import make_aware, get_current_timezone
 from django.urls import reverse
+import calendar
 import json
 import logging
 
@@ -31,6 +36,12 @@ def is_slot_available(staff, datetime_start, duration):
 
     return True
 
+# [Continúa en Part 2: Basic Views]
+
+# ====================================
+# Part 2: Basic Views
+# ====================================
+
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'visits/dashboard.html'
     
@@ -45,6 +56,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             logger.debug(f"El usuario {self.request.user} no tiene perfil de profesor.")
             context['appointments'] = Appointment.objects.none()
         return context
+
 
 class PublicBookingView(TemplateView):
     template_name = 'visits/public_booking.html'
@@ -90,6 +102,11 @@ class PublicBookingView(TemplateView):
         context['stages_json'] = json.dumps(stages)
         return context
 
+# [Continúa en Part 3: Booking Related Views]
+# ====================================
+# Part 3: Booking Related Views
+# ====================================
+
 class StageBookingView(TemplateView):
     template_name = 'visits/stage_booking.html'
     
@@ -104,6 +121,7 @@ class StageBookingView(TemplateView):
         })
         return context
 
+
 class AppointmentViewSet(viewsets.ModelViewSet):
     queryset = Appointment.objects.all()
     serializer_class = AppointmentSerializer
@@ -115,11 +133,18 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         logger.debug("AppointmentViewSet: No se encontró perfil de profesor, devolviendo queryset vacío")
         return self.queryset.none()
 
+
 def staff_by_stage(request, stage_id):
     logger.debug(f"Obteniendo profesores para la etapa con id {stage_id}")
     staff = StaffProfile.objects.filter(allowed_stages=stage_id)
     data = [{'id': s.id, 'name': s.user.get_full_name()} for s in staff]
     return JsonResponse(data, safe=False)
+
+# [Continúa en Part 4: Availability Functions]
+
+# ====================================
+# Part 4: Availability Functions
+# ====================================
 
 def get_stage_availability(request, stage_id):
     try:
@@ -157,6 +182,11 @@ def get_stage_availability(request, stage_id):
     except Exception as e:
         logger.error(f"Error en get_stage_availability: {str(e)}", exc_info=True)
         return JsonResponse({'error': str(e)}, status=500)
+
+# [Continúa en Part 5: Booking Management]
+# ====================================
+# Part 5: Booking Management
+# ====================================
 
 def book_appointment(request, stage_id, slot_id):
     logger.debug(f"book_appointment llamado para stage_id {stage_id} y slot_id {slot_id}")
@@ -213,6 +243,12 @@ def book_appointment(request, stage_id, slot_id):
     }
     return render(request, 'visits/book_appointment.html', context)
 
+# [Continúa en Part 6: Staff Availability View]
+
+# ====================================
+# Part 6: Staff Availability View
+# ====================================
+
 class StaffAvailabilityView(LoginRequiredMixin, View):
     template_name = 'visits/staff_availability.html'
     
@@ -254,9 +290,37 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
             staff_profile = request.user.staffprofile
             start_time = datetime.strptime(request.POST.get('start_time'), '%H:%M').time()
             end_time = datetime.strptime(request.POST.get('end_time'), '%H:%M').time()
+            
+            # Validar horario
             if start_time < time(8, 0) or end_time > time(20, 0):
                 logger.warning("Rango horario inválido para el slot")
                 return JsonResponse({'error': 'Los horarios deben estar entre 8:00 y 20:00'}, status=400)
+                
+            # Validar solapamiento con citas existentes
+            if repeat_type == 'once':
+                date_str = request.POST.get('date')
+                date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+                if staff_profile.has_appointments_in_timeframe(date_obj, start_time, end_time):
+                    logger.warning(f"Se encontró una cita que se solapa en {date_obj} de {start_time} a {end_time}")
+                    return JsonResponse({
+                        'error': 'Ya existe una cita programada en este horario. Por favor, selecciona otro horario.'
+                    }, status=400)
+            elif repeat_type == 'weekly':
+                month = int(request.POST.get('month'))
+                weekday = int(request.POST.get('weekday'))
+                year = datetime.now().year
+                # Verificar todas las fechas del mes para ese día de la semana
+                calendar_month = calendar.monthcalendar(year, month)
+                for week in calendar_month:
+                    if week[weekday] != 0:
+                        check_date = datetime(year, month, week[weekday]).date()
+                        if check_date >= datetime.now().date():
+                            if staff_profile.has_appointments_in_timeframe(check_date, start_time, end_time):
+                                logger.warning(f"Se encontró una cita que se solapa en {check_date} de {start_time} a {end_time}")
+                                return JsonResponse({
+                                    'error': f'Ya existe una cita programada para el {check_date.strftime("%d/%m/%Y")} en este horario.'
+                                }, status=400)
+
             base_slot_data = {
                 'staff': staff_profile,
                 'start_time': start_time,
@@ -265,6 +329,7 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
                 'repeat_type': repeat_type,
                 'is_active': True
             }
+            
             if repeat_type == 'weekly':
                 base_slot_data.update({
                     'month': int(request.POST.get('month')),
@@ -277,11 +342,13 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
                     logger.warning("Intento de crear slot para una fecha pasada")
                     return JsonResponse({'error': 'No se pueden crear slots para fechas pasadas'}, status=400)
                 base_slot_data['date'] = date_obj
+            
             logger.debug(f"Creando slots para las etapas: {[stage.name for stage in staff_profile.allowed_stages.all()]}")
             if repeat_type == 'once':
                 if staff_profile.has_overlapping_slots(base_slot_data['date'], start_time, end_time):
                     logger.warning("Ya existe un slot solapado en ese horario")
                     return JsonResponse({'error': 'Ya existen slots en este horario'}, status=400)
+            
             created_slots = []
             for stage in staff_profile.allowed_stages.all():
                 base_slot = AvailabilitySlot(**base_slot_data, stage=stage)
@@ -289,6 +356,7 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
                 created = AvailabilitySlot.objects.bulk_create(slots_generated)
                 created_slots.extend(created)
                 logger.info(f"Se crearon {len(created)} slots para la etapa {stage.name}")
+            
             logger.info(f"Total de slots creados: {len(created_slots)}")
             grouped_slots = {}
             for slot in created_slots:
@@ -333,8 +401,15 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
             logger.error(f"Error al eliminar slots: {str(e)}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)
 
+# [Continúa en Part 7: Final Views]
+
+# ====================================
+# Part 7: Final Views
+# ====================================
+
 class PrivacyPolicyView(TemplateView):
     template_name = 'visits/privacy_policy.html'
+
 
 class AppointmentConfirmationView(TemplateView):
     template_name = 'visits/appointment_confirmation.html'
@@ -346,3 +421,7 @@ class AppointmentConfirmationView(TemplateView):
         context['appointment'] = appointment
         logger.debug(f"Confirmación de cita para la cita con id {appointment_id}")
         return context
+
+# ====================================
+# End of views.py
+# ===================================
