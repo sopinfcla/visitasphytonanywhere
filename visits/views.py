@@ -11,7 +11,7 @@ from django.http import JsonResponse
 from django.urls import reverse
 from django.contrib import messages
 from django.utils.timezone import make_aware, get_current_timezone
-from django.db.models import Q  # Añadida esta importación
+from django.db.models import Q
 
 # Importaciones de Python
 from datetime import datetime, timedelta, time
@@ -213,7 +213,6 @@ def book_appointment(request, stage_id, slot_id):
         'staff_name': slot.staff.user.get_full_name()
     }
     return render(request, 'visits/book_appointment.html', context)
-
 # ====================================
 # Part 5: Staff Availability
 # ====================================
@@ -422,9 +421,9 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
         except Exception as e:
             logger.error(f"Error deleting slot {slot_id}: {str(e)}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)
-
+        
 # ====================================
-# Part 6: Appointments CRUD
+# Part 6: Appointments CRUD & Basic Views
 # ====================================
 
 class AppointmentsCRUDView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
@@ -442,10 +441,23 @@ class AppointmentsCRUDView(LoginRequiredMixin, UserPassesTestMixin, TemplateView
         try:
             staff_profile = self.request.user.staffprofile
             allowed_stages = list(staff_profile.allowed_stages.values('id', 'name'))
+            
+            # Generar horas disponibles (8:00 - 20:00)
+            available_hours = []
+            for hour in range(8, 21):
+                for minute in [0, 15, 30, 45]:
+                    if hour < 20 or (hour == 20 and minute == 0):
+                        time_str = f"{hour:02d}:{minute:02d}"
+                        available_hours.append({
+                            'value': time_str,
+                            'label': time_str
+                        })
+            
             context.update({
                 'staff_name': self.request.user.get_full_name(),
                 'allowed_stages': allowed_stages,
-                'today': datetime.now().date().isoformat()
+                'today': datetime.now().date().isoformat(),
+                'available_hours': available_hours
             })
         except Exception as e:
             logger.error(f"Error preparing context: {str(e)}")
@@ -453,215 +465,10 @@ class AppointmentsCRUDView(LoginRequiredMixin, UserPassesTestMixin, TemplateView
             context.update({
                 'staff_name': self.request.user.get_full_name(),
                 'allowed_stages': [],
-                'today': datetime.now().date().isoformat()
+                'today': datetime.now().date().isoformat(),
+                'available_hours': []
             })
         return context
-
-class AppointmentAPIView(LoginRequiredMixin, View):
-    def get(self, request, appointment_id=None):
-        try:
-            if appointment_id:
-                appointment = get_object_or_404(
-                    Appointment.objects.select_related('stage'), 
-                    id=appointment_id,
-                    staff=request.user.staffprofile
-                )
-                return JsonResponse(AppointmentSerializer(appointment).data)
-            
-            # Base query
-            queryset = Appointment.objects.select_related('stage', 'staff__user').filter(
-                staff=request.user.staffprofile
-            )
-            
-            # Filtros
-            stage = request.GET.get('stage')
-            date = request.GET.get('date')
-            status = request.GET.get('status')
-            
-            if stage:
-                queryset = queryset.filter(stage_id=stage)
-            if date:
-                queryset = queryset.filter(date__date=date)
-            if status:
-                queryset = queryset.filter(status=status)
-            
-            # Paginación
-            start = int(request.GET.get('start', 0))
-            length = int(request.GET.get('length', 10))
-            draw = int(request.GET.get('draw', 1))
-            
-            # Total records antes de filtrar
-            total_records = queryset.count()
-            
-            # Ordenación
-            order_column = int(request.GET.get('order[0][column]', 0))
-            order_dir = request.GET.get('order[0][dir]', 'desc')
-            order_columns = ['date', 'date', 'visitor_name', 'stage__name', 'status']
-            
-            if order_column < len(order_columns):
-                order = f"-{order_columns[order_column]}" if order_dir == 'desc' else order_columns[order_column]
-                queryset = queryset.order_by(order)
-            
-            paginated_queryset = queryset[start:start + length]
-            
-            # Serializar datos
-            appointments = []
-            for appointment in paginated_queryset:
-                appointments.append({
-                    'id': appointment.id,
-                    'date': appointment.date.isoformat() if appointment.date else None,
-                    'visitor_name': appointment.visitor_name,
-                    'visitor_email': appointment.visitor_email,
-                    'visitor_phone': appointment.visitor_phone,
-                    'stage': appointment.stage.id if appointment.stage else None,
-                    'stage_name': appointment.stage.name if appointment.stage else '',
-                    'status': appointment.status
-                })
-            
-            response_data = {
-                'draw': draw,
-                'recordsTotal': total_records,
-                'recordsFiltered': total_records,
-                'data': appointments
-            }
-            
-            return JsonResponse(response_data)
-            
-        except Exception as e:
-            logger.error(f"Error in appointments API: {str(e)}", exc_info=True)
-            return JsonResponse({
-                'draw': draw if 'draw' in locals() else 1,
-                'recordsTotal': 0,
-                'recordsFiltered': 0,
-                'data': [],
-                'error': str(e)
-            }, status=500)
-
-    def post(self, request):
-        try:
-            data = json.loads(request.body)
-            data['staff'] = request.user.staffprofile.id
-            
-            # Convertir la fecha string a datetime
-            if 'date' in data:
-                data['date'] = make_aware(datetime.fromisoformat(data['date']))
-            
-            serializer = AppointmentSerializer(data=data)
-            if serializer.is_valid():
-                appointment = serializer.save()
-                logger.info(f"Created appointment: {appointment.id}")
-                return JsonResponse(serializer.data)
-            
-            logger.warning(f"Invalid appointment data: {serializer.errors}")
-            return JsonResponse(serializer.errors, status=400)
-            
-        except Exception as e:
-            logger.error(f"Error creating appointment: {str(e)}", exc_info=True)
-            return JsonResponse({'error': str(e)}, status=500)
-
-    def put(self, request, appointment_id):
-        try:
-            appointment = get_object_or_404(
-                Appointment, 
-                id=appointment_id,
-                staff=request.user.staffprofile
-            )
-            data = json.loads(request.body)
-            
-            # Asegurar que no se cambie el staff
-            data['staff'] = request.user.staffprofile.id
-            
-            # Convertir la fecha string a datetime
-            if 'date' in data:
-                data['date'] = make_aware(datetime.fromisoformat(data['date']))
-            
-            serializer = AppointmentSerializer(appointment, data=data, partial=True)
-            if serializer.is_valid():
-                updated_appointment = serializer.save()
-                logger.info(f"Updated appointment: {appointment_id}")
-                return JsonResponse(serializer.data)
-            
-            logger.warning(f"Invalid update data for appointment {appointment_id}: {serializer.errors}")
-            return JsonResponse(serializer.errors, status=400)
-            
-        except Exception as e:
-            logger.error(f"Error updating appointment {appointment_id}: {str(e)}", exc_info=True)
-            return JsonResponse({'error': str(e)}, status=500)
-
-    def delete(self, request, appointment_id):
-        try:
-            appointment = get_object_or_404(
-                Appointment, 
-                id=appointment_id,
-                staff=request.user.staffprofile
-            )
-            appointment.delete()
-            logger.info(f"Deleted appointment: {appointment_id}")
-            return JsonResponse({'status': 'success'})
-            
-        except Exception as e:
-            logger.error(f"Error deleting appointment {appointment_id}: {str(e)}", exc_info=True)
-            return JsonResponse({'error': str(e)}, status=500)
-
-# ====================================
-# Part 7: Basic Views
-# ====================================
-
-class PrivacyPolicyView(TemplateView):
-    template_name = 'visits/privacy_policy.html'
-
-
-class AppointmentConfirmationView(TemplateView):
-    template_name = 'visits/appointment_confirmation.html'
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        appointment_id = kwargs.get('appointment_id')
-        appointment = get_object_or_404(
-            Appointment.objects.select_related('stage', 'staff', 'staff__user'),
-            id=appointment_id
-        )
-        context.update({
-            'appointment': appointment,
-            'staff_name': appointment.staff.user.get_full_name(),
-            'stage_name': appointment.stage.name,
-            'date': appointment.date.strftime('%d/%m/%Y'),
-            'time': appointment.date.strftime('%H:%M')
-        })
-        return context
-# ====================================
-# Part 8: Appointments CRUD Views 
-# ====================================
-class AppointmentsCRUDView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
-    template_name = 'visits/appointments_crud.html'
-
-    def test_func(self):
-        return hasattr(self.request.user, 'staffprofile')
-
-    def handle_no_permission(self):
-        messages.error(self.request, 'No tienes permisos para acceder a esta página.')
-        return redirect('public_booking')
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        try:
-            staff_profile = self.request.user.staffprofile
-            allowed_stages = list(staff_profile.allowed_stages.values('id', 'name'))
-            context.update({
-                'staff_name': self.request.user.get_full_name(),
-                'allowed_stages': allowed_stages,
-                'today': datetime.now().date().isoformat()
-            })
-        except Exception as e:
-            logger.error(f"Error preparing context: {str(e)}")
-            messages.warning(self.request, 'Tu perfil de staff no está configurado correctamente.')
-            context.update({
-                'staff_name': self.request.user.get_full_name(),
-                'allowed_stages': [],
-                'today': datetime.now().date().isoformat()
-            })
-        return context
-
 
 class AppointmentAPIView(LoginRequiredMixin, View):
     def get(self, request, appointment_id=None):
@@ -681,14 +488,20 @@ class AppointmentAPIView(LoginRequiredMixin, View):
 
             # Búsqueda global
             search = request.GET.get('search')
+            logger.debug(f"Búsqueda recibida: {search}")  # Verifica la cadena de búsqueda recibida
+
             if search:
-                from django.db.models import Q
+                logger.debug(f"Consulta antes del filtro: {queryset.query}")  # Consulta SQL antes del filtro
+
                 queryset = queryset.filter(
                     Q(visitor_name__icontains=search) |
                     Q(visitor_email__icontains=search) |
                     Q(visitor_phone__icontains=search) |
                     Q(stage__name__icontains=search)
                 )
+
+                logger.debug(f"Consulta después del filtro: {queryset.query}")  # Consulta SQL después del filtro
+
 
             # Filtros específicos
             stage = request.GET.get('stage')
@@ -702,24 +515,26 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             if status:
                 queryset = queryset.filter(status=status)
 
-            # Paginación
-            start = int(request.GET.get('start', 0))
-            length = int(request.GET.get('length', 10))
-            draw = int(request.GET.get('draw', 1))
-
             # Total records antes de filtrar
             total_records = queryset.count()
             filtered_records = queryset.count()
 
             # Ordenación
-            order_column = int(request.GET.get('order[0][column]', 0))
+            order_column = request.GET.get('order[0][column]', '0')
             order_dir = request.GET.get('order[0][dir]', 'desc')
-            order_columns = ['date', 'visitor_name', 'stage__name', 'status']
+            order_columns = ['date', 'date', 'visitor_name', 'stage__name', 'status']
+            
+            # Asegurarse de que el índice de columna es válido
+            if order_column and order_column.isdigit():
+                order_col_num = int(order_column)
+                if order_col_num < len(order_columns):
+                    order = f"-{order_columns[order_col_num]}" if order_dir == 'desc' else order_columns[order_col_num]
+                    queryset = queryset.order_by(order)
 
-            if order_column < len(order_columns):
-                order = f"-{order_columns[order_column]}" if order_dir == 'desc' else order_columns[order_column]
-                queryset = queryset.order_by(order)
-
+            # Paginación
+            start = int(request.GET.get('start', 0))
+            length = int(request.GET.get('length', 10))
+            
             paginated_queryset = queryset[start:start + length]
 
             # Serializar datos
@@ -733,11 +548,12 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                     'visitor_phone': appointment.visitor_phone,
                     'stage': appointment.stage.id if appointment.stage else None,
                     'stage_name': appointment.stage.name if appointment.stage else '',
-                    'status': appointment.status
+                    'status': appointment.status,
+                    'duration': getattr(appointment, 'duration', 30)  # Default 30 min si no existe
                 })
 
             response_data = {
-                'draw': draw,
+                'draw': int(request.GET.get('draw', 1)),
                 'recordsTotal': total_records,
                 'recordsFiltered': filtered_records,
                 'data': appointments
@@ -748,7 +564,7 @@ class AppointmentAPIView(LoginRequiredMixin, View):
         except Exception as e:
             logger.error(f"Error in appointments API: {str(e)}", exc_info=True)
             return JsonResponse({
-                'draw': draw if 'draw' in locals() else 1,
+                'draw': int(request.GET.get('draw', 1)),
                 'recordsTotal': 0,
                 'recordsFiltered': 0,
                 'data': [],
@@ -759,15 +575,15 @@ class AppointmentAPIView(LoginRequiredMixin, View):
         try:
             data = json.loads(request.body)
             data['staff'] = request.user.staffprofile.id
-
-            if 'date' in data:
-                data['date'] = make_aware(datetime.fromisoformat(data['date']))
-
-            # Verificar solapamientos
+            
+            appointment_date = make_aware(datetime.fromisoformat(data['date']))
+            duration = int(data.get('duration', 30))  # duración por defecto 30 min si no se especifica
+            
+            # Verificar solapamientos con otras citas usando la duración especificada
             overlap = Appointment.objects.filter(
                 staff=request.user.staffprofile,
-                date__lt=data['date'] + timedelta(minutes=30),
-                date__gt=data['date'] - timedelta(minutes=30)
+                date__lt=appointment_date + timedelta(minutes=duration),
+                date__gt=appointment_date - timedelta(minutes=duration)
             ).exists()
 
             if overlap:
@@ -779,20 +595,20 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             if serializer.is_valid():
                 appointment = serializer.save()
                 
-                # Eliminar slots solapados
+                # Eliminar slots de disponibilidad que se solapen
                 AvailabilitySlot.objects.filter(
                     staff=request.user.staffprofile,
-                    date=data['date'].date(),
-                    start_time__lt=(data['date'] + timedelta(minutes=30)).time(),
-                    end_time__gt=(data['date'] - timedelta(minutes=30)).time()
+                    date=appointment_date.date(),
+                    start_time__lt=(appointment_date + timedelta(minutes=duration)).time(),
+                    end_time__gt=appointment_date.time()
                 ).delete()
                 
                 logger.info(f"Created appointment: {appointment.id}")
                 return JsonResponse(serializer.data)
-
+            
             logger.warning(f"Invalid appointment data: {serializer.errors}")
             return JsonResponse(serializer.errors, status=400)
-
+            
         except Exception as e:
             logger.error(f"Error creating appointment: {str(e)}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)
@@ -808,13 +624,14 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             data['staff'] = request.user.staffprofile.id
 
             if 'date' in data:
-                data['date'] = make_aware(datetime.fromisoformat(data['date']))
+                appointment_date = make_aware(datetime.fromisoformat(data['date']))
+                duration = int(data.get('duration', appointment.duration or 30))
                 
                 # Verificar solapamientos excluyendo la cita actual
                 overlap = Appointment.objects.filter(
                     staff=request.user.staffprofile,
-                    date__lt=data['date'] + timedelta(minutes=30),
-                    date__gt=data['date'] - timedelta(minutes=30)
+                    date__lt=appointment_date + timedelta(minutes=duration),
+                    date__gt=appointment_date - timedelta(minutes=duration)
                 ).exclude(id=appointment_id).exists()
 
                 if overlap:
@@ -827,12 +644,12 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                 updated_appointment = serializer.save()
                 
                 if 'date' in data:
-                    # Eliminar slots solapados
+                    # Eliminar slots solapados con la nueva fecha
                     AvailabilitySlot.objects.filter(
                         staff=request.user.staffprofile,
-                        date=data['date'].date(),
-                        start_time__lt=(data['date'] + timedelta(minutes=30)).time(),
-                        end_time__gt=(data['date'] - timedelta(minutes=30)).time()
+                        date=appointment_date.date(),
+                        start_time__lt=(appointment_date + timedelta(minutes=duration)).time(),
+                        end_time__gt=appointment_date.time()
                     ).delete()
                 
                 logger.info(f"Updated appointment: {appointment_id}")
@@ -852,8 +669,6 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                 id=appointment_id,
                 staff=request.user.staffprofile
             )
-            
-            # Reactivar slots relacionados
             appointment.delete()
             logger.info(f"Deleted appointment: {appointment_id}")
             return JsonResponse({'status': 'success'})
@@ -862,28 +677,24 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             logger.error(f"Error deleting appointment {appointment_id}: {str(e)}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)
 
-    def check_overlap(self, request):
-        try:
-            data = json.loads(request.body)
-            date = make_aware(datetime.fromisoformat(data['date']))
-            
-            # Buscar citas solapadas
-            overlap = Appointment.objects.filter(
-                staff=request.user.staffprofile,
-                date__lt=date + timedelta(minutes=30),
-                date__gt=date - timedelta(minutes=30)
-            ).exists()
-            
-            if overlap:
-                # Eliminar slots solapados
-                AvailabilitySlot.objects.filter(
-                    staff=request.user.staffprofile,
-                    date=date.date(),
-                    start_time__lt=(date + timedelta(minutes=30)).time(),
-                    end_time__gt=(date - timedelta(minutes=30)).time()
-                ).delete()
-                
-            return JsonResponse({'overlap': overlap})
-            
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
+class PrivacyPolicyView(TemplateView):
+    template_name = 'visits/privacy_policy.html'
+
+class AppointmentConfirmationView(TemplateView):
+    template_name = 'visits/appointment_confirmation.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        appointment_id = kwargs.get('appointment_id')
+        appointment = get_object_or_404(
+            Appointment.objects.select_related('stage', 'staff', 'staff__user'),
+            id=appointment_id
+        )
+        context.update({
+            'appointment': appointment,
+            'staff_name': appointment.staff.user.get_full_name(),
+            'stage_name': appointment.stage.name,
+            'date': appointment.date.strftime('%d/%m/%Y'),
+            'time': appointment.date.strftime('%H:%M')
+        })
+        return context

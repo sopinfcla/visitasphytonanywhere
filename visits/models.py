@@ -77,6 +77,7 @@ class Appointment(models.Model):
     visitor_email = models.EmailField()
     visitor_phone = models.CharField(max_length=20)
     date = models.DateTimeField()
+    duration = models.PositiveIntegerField(default=60)  # Duración en minutos
     created_at = models.DateTimeField(auto_now_add=True)
     comments = models.TextField(blank=True, null=True)
     status = models.CharField(

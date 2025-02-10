@@ -77,8 +77,9 @@ function initializeDataTable() {
                         column: d.order[0].column,
                         dir: d.order[0].dir
                     }],
-                    search: d.search.value,
+                    search: $('.dataTables_filter input').val(),  // Aquí se asegura que el valor de búsqueda sea correcto
                 };
+            
                 
                 const stage = $('#stage-filter').val();
                 const date = $('#date-filter').val();
@@ -170,12 +171,11 @@ function initializeDataTable() {
     });
 
     // Manejar búsqueda con debounce
-    $('.dataTables_filter input').off().on('input', function() {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
+    // Búsqueda en tiempo real sin debounce manual
+        $('.dataTables_filter input').off().on('input', function() {
             appointmentsTable.search(this.value).draw();
-        }, 500);
-    });
+        });
+
 
     // Control del mensaje de procesamiento
     let processingTimeout;
