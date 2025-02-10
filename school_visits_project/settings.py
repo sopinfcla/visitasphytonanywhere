@@ -17,59 +17,71 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'visits.apps.VisitsConfig',  #
+    'visits.apps.VisitsConfig',
 ]
 
+# Configuración de Django Rest Framework
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PAGINATION_CLASS': None,
+    'PAGE_SIZE': None,
+}
+
 MIDDLEWARE = [
-  'django.middleware.security.SecurityMiddleware',
-  'django.contrib.sessions.middleware.SessionMiddleware',
-  'django.middleware.common.CommonMiddleware',
-  'django.middleware.csrf.CsrfViewMiddleware',
-  'django.contrib.auth.middleware.AuthenticationMiddleware',
-  'django.contrib.messages.middleware.MessageMiddleware',
-  'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
 ROOT_URLCONF = 'school_visits_project.urls'
 
 TEMPLATES = [
-  {
-      'BACKEND': 'django.template.backends.django.DjangoTemplates',
-      'DIRS': [BASE_DIR / 'templates'],
-      'APP_DIRS': True,
-      'OPTIONS': {
-          'context_processors': [
-              'django.template.context_processors.debug',
-              'django.template.context_processors.request',
-              'django.contrib.auth.context_processors.auth',
-              'django.contrib.messages.context_processors.messages',
-          ],
-      },
-  },
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [BASE_DIR / 'templates'],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
 ]
 
 WSGI_APPLICATION = 'school_visits_project.wsgi.application'
 
 DATABASES = {
-  'default': {
-      'ENGINE': 'django.db.backends.sqlite3',
-      'NAME': BASE_DIR / 'db.sqlite3',
-  }
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
 }
 
 AUTH_PASSWORD_VALIDATORS = [
-  {
-      'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-  },
-  {
-      'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-  },
-  {
-      'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-  },
-  {
-      'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-  },
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
 ]
 
 LANGUAGE_CODE = 'es-es'
@@ -81,19 +93,17 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
-   BASE_DIR / 'visits' / 'static'
+    BASE_DIR / 'visits' / 'static'
 ]
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-LOGOUT_REDIRECT_URL = '/'  # Redirige a la página principal después del logout
+LOGOUT_REDIRECT_URL = '/'
 
-
-
-# Ejemplo de configuración de logging en settings.py
+# Configuración de Logging
 LOGGING = {
-    'version': 1,  # Versión del diccionario de configuración de logging
-    'disable_existing_loggers': False,  # Permite que se usen también los loggers existentes de Django
+    'version': 1,
+    'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
             'format': '[{levelname}] {asctime} {module} {process:d} {thread:d} {message}',
@@ -105,29 +115,27 @@ LOGGING = {
         },
     },
     'handlers': {
-        'console': {  # Handler para imprimir en consola
+        'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'verbose',  # Puedes usar 'simple' si prefieres un formato más sencillo
+            'formatter': 'verbose',
         },
-        # Opcional: Handler para escribir en un archivo de log
         'file': {
             'class': 'logging.FileHandler',
             'filename': os.path.join(Path(__file__).resolve().parent, 'django.log'),
             'formatter': 'verbose',
         },
     },
-    'root': {  # Logger raíz: afecta a todos los mensajes de log
-        'handlers': ['console', 'file'],  # O solo 'console' si no deseas escribir en archivo
-        'level': 'DEBUG',  # Ajusta el nivel (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-    },
     'loggers': {
-        'django': {  # Logger para los mensajes internos de Django
+        '': {  # Root logger
             'handlers': ['console', 'file'],
             'level': 'INFO',
-            'propagate': True,
         },
-        # Logger para tus módulos, por ejemplo, si tu app se llama "visits"
-        'visits': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'visits': {  # App logger
             'handlers': ['console', 'file'],
             'level': 'DEBUG',
             'propagate': False,
@@ -135,6 +143,13 @@ LOGGING = {
     },
 }
 
+# Configuración de Autenticación
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'appointments_crud'
 
-LOGIN_URL = 'login'  # Ajustar según el nombre que demos a la URL de login
-LOGIN_REDIRECT_URL = 'appointments_crud'  # Redirigir aquí después del login
+# Configuración de CSRF
+CSRF_TRUSTED_ORIGINS = ['http://localhost:8000']
+
+# Configuración de Sesiones
+SESSION_COOKIE_AGE = 86400  # 24 horas en segundos
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False

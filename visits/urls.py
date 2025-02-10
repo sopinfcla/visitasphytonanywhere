@@ -1,11 +1,6 @@
-# visits/urls.py
-from django.urls import path, include
+from django.urls import path
 from django.contrib.auth import views as auth_views
-from rest_framework.routers import DefaultRouter
 from . import views
-
-router = DefaultRouter()
-router.register(r'appointments', views.AppointmentViewSet)
 
 urlpatterns = [
     # Autenticación
@@ -27,11 +22,12 @@ urlpatterns = [
     path('appointments/', views.AppointmentsCRUDView.as_view(), name='appointments_crud'),
     
     # API endpoints
-    path('api/', include(router.urls)),
     path('api/stage/<int:stage_id>/availability/', views.get_stage_availability, name='stage_availability'),
     path('api/stage/<int:stage_id>/staff/', views.staff_by_stage, name='staff_by_stage'),
     path('api/availability/', views.StaffAvailabilityView.as_view(), name='api_availability'),
     path('api/availability/<int:slot_id>/', views.StaffAvailabilityView.as_view(), name='api_delete_availability'),
+    
+    # API Appointments
     path('api/appointments/', views.AppointmentAPIView.as_view(), name='api_appointments'),
     path('api/appointments/<int:appointment_id>/', views.AppointmentAPIView.as_view(), name='api_appointment_detail'),
 ]
