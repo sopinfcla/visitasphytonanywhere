@@ -2,19 +2,27 @@
 # Part 1: Imports and Base Functions
 # ====================================
 
-from django.shortcuts import render, get_object_or_404
+# Importaciones de Django
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.models import User
+from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic import TemplateView, View
-from rest_framework import viewsets
 from django.http import JsonResponse
-from datetime import datetime, timedelta, time
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.urls import reverse, reverse_lazy
+from django.contrib import messages
 from django.utils.timezone import make_aware, get_current_timezone
-from django.urls import reverse
+
+# Importaciones de Rest Framework
+from rest_framework import viewsets
+
+# Importaciones de Python
+from datetime import datetime, timedelta, time
 import calendar
 import json
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 from .models import Appointment, SchoolStage, StaffProfile, AvailabilitySlot
 from .serializers import AppointmentSerializer, AvailabilitySlotSerializer, CalendarDaySerializer
@@ -423,5 +431,172 @@ class AppointmentConfirmationView(TemplateView):
         return context
 
 # ====================================
-# End of views.py
-# ===================================
+# Part 8: Appointments CRUD Views
+# ====================================
+
+# Part 8: Appointments CRUD Views
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.shortcuts import redirect
+from django.urls import reverse_lazy
+from django.contrib import messages
+from django.views.generic import TemplateView, View
+from django.http import JsonResponse
+from datetime import datetime
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+class AppointmentsCRUDView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+    template_name = 'visits/appointments_crud.html'
+    
+    def test_func(self):
+        logger.debug(f"Checking access for user {self.request.user}")
+        return self.request.user.is_staff
+    
+    def handle_no_permission(self):
+        logger.warning(f"Access denied for user: {self.request.user}")
+        messages.error(self.request, 'No tienes permisos para acceder a esta página.')
+        return redirect('public_booking')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        logger.debug(f"Getting context data for user: {self.request.user}")
+        
+        try:
+            staff_profile = self.request.user.staffprofile
+            allowed_stages = list(staff_profile.allowed_stages.values('id', 'name'))
+            
+            context.update({
+                'staff_name': self.request.user.get_full_name(),
+                'allowed_stages': allowed_stages,
+                'today': datetime.now().date().isoformat()
+            })
+            logger.info(f"Context prepared successfully for {staff_profile}")
+            
+        except Exception as e:
+            logger.error(f"Error preparing context: {str(e)}")
+            messages.warning(self.request, 'Tu perfil de staff no está configurado correctamente.')
+            context.update({
+                'staff_name': self.request.user.get_full_name(),
+                'allowed_stages': [],
+                'today': datetime.now().date().isoformat()
+            })
+        
+        return context
+
+class AppointmentAPIView(LoginRequiredMixin, View):
+    def get(self, request, appointment_id=None):
+        logger.debug(f"GET request to appointments API - User: {request.user}")
+        try:
+            if appointment_id:
+                appointment = get_object_or_404(
+                    Appointment.objects.select_related('stage'), 
+                    id=appointment_id,
+                    staff=request.user.staffprofile
+                )
+                return JsonResponse(AppointmentSerializer(appointment).data)
+            
+            # Base query optimizada
+            queryset = Appointment.objects.select_related('stage', 'staff__user').filter(
+                staff=request.user.staffprofile
+            )
+            
+            # Paginación
+            start = int(request.GET.get('start', 0))
+            length = int(request.GET.get('length', 10))
+            draw = int(request.GET.get('draw', 1))
+            
+            # Total records antes de filtrar
+            total_records = queryset.count()
+            logger.debug(f"Total records: {total_records}")
+            
+            # Ordenación
+            order_column = int(request.GET.get('order[0][column]', 0))
+            order_dir = request.GET.get('order[0][dir]', 'desc')
+            order_columns = ['date', 'date', 'visitor_name', 'stage__name', 'status']
+            
+            order = f"-{order_columns[order_column]}" if order_dir == 'desc' else order_columns[order_column]
+            queryset = queryset.order_by(order)
+            
+            # Aplicar paginación después de ordenar
+            paginated_queryset = queryset[start:start + length]
+            
+            # Serializar datos
+            serialized_data = []
+            for appointment in paginated_queryset:
+                serialized_data.append({
+                    'id': appointment.id,
+                    'date': appointment.date.isoformat() if appointment.date else None,
+                    'visitor_name': appointment.visitor_name,
+                    'visitor_email': appointment.visitor_email,
+                    'stage_name': appointment.stage.name if appointment.stage else '',
+                    'status': appointment.status
+                })
+            
+            response_data = {
+                'draw': draw,
+                'recordsTotal': total_records,
+                'recordsFiltered': total_records,
+                'data': serialized_data
+            }
+            
+            logger.debug(f"Sending response with {len(serialized_data)} appointments")
+            return JsonResponse(response_data)
+            
+        except Exception as e:
+            logger.error(f"Error in appointments API: {str(e)}", exc_info=True)
+            return JsonResponse({
+                'draw': draw,
+                'recordsTotal': 0,
+                'recordsFiltered': 0,
+                'data': []
+            })
+
+    def post(self, request):
+        try:
+            data = json.loads(request.body)
+            data['staff'] = request.user.staffprofile.id
+            
+            serializer = AppointmentSerializer(data=data)
+            if serializer.is_valid():
+                serializer.save()
+                return JsonResponse(serializer.data)
+            return JsonResponse(serializer.errors, status=400)
+            
+        except Exception as e:
+            logger.error(f"Error creating appointment: {str(e)}", exc_info=True)
+            return JsonResponse({'error': str(e)}, status=500)
+
+    def put(self, request, appointment_id):
+        try:
+            appointment = get_object_or_404(
+                Appointment, 
+                id=appointment_id,
+                staff=request.user.staffprofile
+            )
+            data = json.loads(request.body)
+            
+            serializer = AppointmentSerializer(appointment, data=data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return JsonResponse(serializer.data)
+            return JsonResponse(serializer.errors, status=400)
+            
+        except Exception as e:
+            logger.error(f"Error updating appointment: {str(e)}", exc_info=True)
+            return JsonResponse({'error': str(e)}, status=500)
+
+    def delete(self, request, appointment_id):
+        try:
+            appointment = get_object_or_404(
+                Appointment, 
+                id=appointment_id,
+                staff=request.user.staffprofile
+            )
+            appointment.delete()
+            return JsonResponse({'status': 'success'})
+            
+        except Exception as e:
+            logger.error(f"Error deleting appointment: {str(e)}", exc_info=True)
+            return JsonResponse({'error': str(e)}, status=500)

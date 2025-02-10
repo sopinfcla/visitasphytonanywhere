@@ -134,3 +134,7 @@ LOGGING = {
         },
     },
 }
+
+
+LOGIN_URL = 'login'  # Ajustar según el nombre que demos a la URL de login
+LOGIN_REDIRECT_URL = 'appointments_crud'  # Redirigir aquí después del login

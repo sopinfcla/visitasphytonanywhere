@@ -1,3 +1,7 @@
+# ====================================
+# Part 1: Imports and Configuration
+# ====================================
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -8,6 +12,10 @@ import calendar
 import logging
 
 logger = logging.getLogger(__name__)
+
+# ====================================
+# Part 2: Base Models
+# ====================================
 
 class SchoolStage(models.Model):
     name = models.CharField(max_length=100)
@@ -52,7 +60,17 @@ class StaffProfile(models.Model):
             logger.info(f"Se encontró una cita que se solapa en el intervalo {start_time} – {end_time} en {date}")
         return exists
 
+# ====================================
+# Part 3: Appointment Management
+# ====================================
+
 class Appointment(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pendiente'),
+        ('completed', 'Realizada'),
+        ('cancelled', 'Cancelada')
+    ]
+    
     stage = models.ForeignKey(SchoolStage, on_delete=models.CASCADE)
     staff = models.ForeignKey(StaffProfile, on_delete=models.CASCADE)
     visitor_name = models.CharField(max_length=200)
@@ -61,12 +79,18 @@ class Appointment(models.Model):
     date = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
     comments = models.TextField(blank=True, null=True)
+    status = models.CharField(
+        max_length=20, 
+        choices=STATUS_CHOICES,
+        default='pending'
+    )
     
     class Meta:
         ordering = ['-date']
         indexes = [
             models.Index(fields=['date']),
             models.Index(fields=['staff', 'date']),
+            models.Index(fields=['status']),
         ]
     
     def clean(self):
@@ -95,12 +119,16 @@ class Appointment(models.Model):
             logger.info(f"La cita para {self.visitor_name} a las {self.date} se validó correctamente")
     
     def save(self, *args, **kwargs):
-        self.full_clean()  
+        self.full_clean()
         logger.debug(f"Guardando la cita para {self.visitor_name} a las {self.date}")
         super().save(*args, **kwargs)
     
     def __str__(self):
         return f"{self.visitor_name} - {self.date}"
+
+# ====================================
+# Part 4: Availability Management
+# ====================================
 
 class AvailabilitySlot(models.Model):
     REPEAT_CHOICES = [
@@ -155,7 +183,7 @@ class AvailabilitySlot(models.Model):
             if self.month < current_month:
                 logger.warning("No se pueden crear slots para meses pasados")
                 raise ValidationError({'month': 'No se pueden crear slots para meses pasados'})
-            self.date = None  
+            self.date = None
         
         if self.end_time <= self.start_time:
             logger.warning("La hora de fin debe ser posterior a la hora de inicio")
@@ -211,7 +239,7 @@ class AvailabilitySlot(models.Model):
         else:
             logger.debug("El slot no está disponible debido a una cita existente")
         return available
-    
+
     def generate_slots(self):
         """
         Genera slots a partir de la disponibilidad base.
@@ -305,7 +333,7 @@ class AvailabilitySlot(models.Model):
         
         logger.info(f"Generados {len(slots)} slots mensuales para el mes {self.month} en el día de la semana {self.weekday}")
         return slots
-        
+
     def __str__(self):
         if self.date:
             return f"{self.staff} - {self.date} {self.start_time}"

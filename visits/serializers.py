@@ -4,28 +4,37 @@ from django.utils.timezone import make_aware, localtime
 from datetime import datetime, timedelta
 
 class AppointmentSerializer(serializers.ModelSerializer):
-    fecha_y_hora = serializers.SerializerMethodField()
+    """Serializer for Appointment model with calendar and CRUD functionality"""
+    # Calendar-specific fields
     title = serializers.SerializerMethodField()
     start = serializers.SerializerMethodField()
     end = serializers.SerializerMethodField()
     
+    # CRUD-specific fields
+    stage_name = serializers.CharField(source='stage.name', read_only=True)
+    fecha_y_hora = serializers.SerializerMethodField()
+    status = serializers.CharField(required=False, default='pending')
+    
     class Meta:
         model = Appointment
-        fields = ['id', 'title', 'start', 'end', 'fecha_y_hora', 'visitor_name', 'visitor_email', 'visitor_phone']
+        fields = [
+            # Base fields
+            'id', 'visitor_name', 'visitor_email', 'visitor_phone',
+            'stage', 'stage_name', 'status', 'comments', 'staff', 'date',
+            # Calendar fields
+            'title', 'start', 'end', 'fecha_y_hora'
+        ]
         
     def get_title(self, obj):
         return f"{obj.visitor_name} - {obj.stage.name}"
         
     def get_start(self, obj):
-        # Usar la fecha/hora sin conversión de zona horaria
         return obj.date
         
     def get_end(self, obj):
-        # Usar la fecha/hora sin conversión de zona horaria
         return obj.date + timedelta(minutes=30)
 
     def get_fecha_y_hora(self, obj):
-        # Usamos la hora del slot original
         return obj.date.strftime('%d/%m/%Y %H:%M')
 
 class AvailabilitySlotSerializer(serializers.ModelSerializer):
@@ -40,11 +49,9 @@ class AvailabilitySlotSerializer(serializers.ModelSerializer):
         fields = ['id', 'time', 'date', 'available', 'staff_name', 'fecha_y_hora']
     
     def get_time(self, obj):
-        # Mantener la hora original del slot sin conversiones
         return obj.start_time.strftime('%H:%M')
     
     def get_date(self, obj):
-        # Mantener la fecha original del slot sin conversiones
         return obj.date.isoformat()
         
     def get_available(self, obj):
@@ -54,7 +61,6 @@ class AvailabilitySlotSerializer(serializers.ModelSerializer):
         return obj.staff.user.get_full_name()
 
     def get_fecha_y_hora(self, obj):
-        # Para mostrar en el listado
         fecha = obj.date.strftime('%d/%m/%Y')
         hora = obj.start_time.strftime('%H:%M')
         return f"{fecha} {hora}"
@@ -83,15 +89,12 @@ class SlotDetailSerializer(serializers.ModelSerializer):
         return obj.staff.user.get_full_name()
     
     def get_time(self, obj):
-        # Mantener hora original del slot
         return obj.start_time.strftime('%H:%M')
         
     def get_date(self, obj):
-        # Mantener fecha original del slot
         return obj.date.isoformat()
 
     def get_fecha_y_hora(self, obj):
-        # Formato consistente para mostrar
         fecha = obj.date.strftime('%d/%m/%Y')
         hora = obj.start_time.strftime('%H:%M')
         return f"{fecha} {hora}"

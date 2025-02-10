@@ -1,169 +1,212 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <title>Reserva tu Visita - Colegio Claretianos Segovia</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    {% load static %}
-    <!-- CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <!-- FullCalendar -->
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
-    {% block extra_css %}{% endblock %}
-    <style>
-        :root {
-            --primary-color: #0d6efd;
-            --header-height: 80px;
-        }
-
-        .hover-shadow {
-            transition: all 0.3s ease-in-out;
-        }
-        .hover-shadow:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
-        }
-
-        .footer-link {
-            color: white;
-            text-decoration: none;
-            transition: opacity 0.3s ease;
-        }
-        .footer-link:hover {
-            color: white;
-            opacity: 0.8;
-        }
-
-        .nav-link {
-            transition: opacity 0.2s ease;
-        }
-        .nav-link:hover {
-            opacity: 0.8;
-        }
-
-        .logo-link {
-            transition: opacity 0.2s ease;
-        }
-        .logo-link:hover {
-            opacity: 0.9;
-        }
-    </style>
-</head>
-<body class="min-vh-100 d-flex flex-column">
-    <!-- Header Desktop -->
-    <header class="bg-primary text-white shadow-sm d-none d-md-block">
-        <div class="container">
-            <div class="d-flex align-items-center justify-content-between" style="height: 80px;">
-                <a href="{% url 'public_booking' %}" class="logo-link d-flex align-items-center text-white text-decoration-none">
-                    <img 
-                        src="{% static 'visits/images/logo.png' %}" 
-                        alt="Colegio Claretianos Segovia" 
-                        style="height: 56px; width: auto;"
-                    >
-                    <div class="bg-white opacity-25 mx-3" style="width: 1px; height: 40px;"></div>
-                    <h1 class="h4 m-0">Reserva tu Visita al Cole</h1>
-                </a>
-                <nav class="d-flex align-items-center gap-4">
-                    <a class="text-white text-decoration-none {% if request.resolver_match.url_name == 'public_booking' %}fw-bold{% endif %}" 
-                       href="{% url 'public_booking' %}">
-                       <i class="fas fa-home me-2"></i>Inicio
-                    </a>
-                    {% if user.is_authenticated %}
-                        {% if user.is_staff %}
-                            <a class="text-white text-decoration-none {% if request.resolver_match.url_name == 'dashboard' %}fw-bold{% endif %}" 
-                               href="{% url 'dashboard' %}">
-                               <i class="fas fa-th-large me-2"></i>Panel de Control
-                            </a>
-                            <a class="text-white text-decoration-none {% if request.resolver_match.url_name == 'availability' %}fw-bold{% endif %}" 
-                               href="{% url 'staff_availability' %}">
-                               <i class="fas fa-calendar-alt me-2"></i>Gestionar Disponibilidad
-                            </a>
-                        {% endif %}
-                        <a class="text-white text-decoration-none" href="{% url 'logout' %}">
-                            <i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión
-                        </a>
-                    {% endif %}
-                </nav>
-            </div>
-        </div>
-    </header>
-
-    <!-- Header Mobile -->
-    <nav class="navbar navbar-dark bg-primary d-md-none">
-        <div class="container">
-            <a href="{% url 'public_booking' %}" class="navbar-brand d-flex align-items-center">
-                <img 
-                    src="{% static 'visits/images/logo.png' %}" 
-                    alt="Colegio Claretianos Segovia" 
-                    style="height: 48px; width: auto;"
-                    class="me-2"
-                >
-                <span class="h5 mb-0">Reserva tu Visita</span>
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
-                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse mt-2" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'public_booking' %}active{% endif %}" 
-                           href="{% url 'public_booking' %}">
-                           <i class="fas fa-home me-2"></i>Inicio
-                        </a>
-                    </li>
-                    {% if user.is_authenticated %}
-                        {% if user.is_staff %}
-                            <li class="nav-item">
-                                <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" 
-                                   href="{% url 'dashboard' %}">
-                                   <i class="fas fa-th-large me-2"></i>Panel de Control
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link {% if request.resolver_match.url_name == 'availability' %}active{% endif %}" 
-                                   href="{% url 'staff_availability' %}">
-                                   <i class="fas fa-calendar-alt me-2"></i>Gestionar Disponibilidad
-                                </a>
-                            </li>
-                        {% endif %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'logout' %}">
-                                <i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión
-                            </a>
-                        </li>
-                    {% endif %}
-                </ul>
-            </div>
-        </div>
-    </nav>
-
-    <!-- Contenido Principal -->
-    <main class="flex-grow-1">
-        {% block content %}
-        {% endblock %}
-    </main>
-
-    <!-- Footer -->
-    <footer class="bg-primary text-white py-3 mt-4">
-        <div class="container text-center">
-            <p class="mb-0">
-                © {% now "Y" %} Colegio Claretianos Segovia - 
-                <a href="tel:+34921420300" class="footer-link">
-                    <i class="fas fa-phone me-1"></i>921 42 03 00
-                </a> - 
-                <a href="https://claretsegovia.es" class="footer-link" target="_blank" rel="noopener">
-                    <i class="fas fa-globe me-1"></i>claretsegovia.es
-                </a>
-            </p>
-        </div>
-    </footer>
-
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales/es.js"></script>
-    {% block extra_js %}{% endblock %}
-</body>
-</html>
+<!-- ====================================
+     Part 1: Document Setup & Head
+     ==================================== -->
+     <!DOCTYPE html>
+     <html lang="es">
+     <head>
+         <title>Reserva tu Visita - Colegio Claretianos Segovia</title>
+         <meta charset="UTF-8">
+         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+         {% load static %}
+         
+         <!-- ====================================
+              Part 2: CSS Dependencies
+              ==================================== -->
+         <!-- Bootstrap & FontAwesome -->
+         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+         <!-- FullCalendar -->
+         <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
+         <!-- Custom CSS -->
+         {% block extra_css %}{% endblock %}
+         
+         <!-- ====================================
+              Part 3: Core Styles
+              ==================================== -->
+         <style>
+             :root {
+                 --primary-color: #0d6efd;
+                 --header-height: 80px;
+             }
+     
+             .hover-shadow {
+                 transition: all 0.3s ease-in-out;
+             }
+             .hover-shadow:hover {
+                 transform: translateY(-5px);
+                 box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+             }
+     
+             .footer-link {
+                 color: white;
+                 text-decoration: none;
+                 transition: opacity 0.3s ease;
+             }
+             .footer-link:hover {
+                 color: white;
+                 opacity: 0.8;
+             }
+     
+             .nav-link {
+                 transition: opacity 0.2s ease;
+             }
+             .nav-link:hover {
+                 opacity: 0.8;
+             }
+     
+             .logo-link {
+                 transition: opacity 0.2s ease;
+             }
+             .logo-link:hover {
+                 opacity: 0.9;
+             }
+         </style>
+     </head>
+     
+     <!-- ====================================
+          Part 4: Body Structure
+          ==================================== -->
+     <body class="min-vh-100 d-flex flex-column">
+         <!-- ====================================
+              Part 5: Desktop Header
+              ==================================== -->
+         <header class="bg-primary text-white shadow-sm d-none d-md-block">
+             <div class="container">
+                 <div class="d-flex align-items-center justify-content-between" style="height: 80px;">
+                     <!-- Logo & Title -->
+                     <a href="{% url 'public_booking' %}" class="logo-link d-flex align-items-center text-white text-decoration-none">
+                         <img src="{% static 'visits/images/logo.png' %}" 
+                              alt="Colegio Claretianos Segovia" 
+                              style="height: 56px; width: auto;">
+                         <div class="bg-white opacity-25 mx-3" style="width: 1px; height: 40px;"></div>
+                         <h1 class="h4 m-0">Reserva tu Visita al Cole</h1>
+                     </a>
+                     
+                     <!-- Desktop Navigation -->
+                     <nav class="d-flex align-items-center gap-4">
+                         <a class="text-white text-decoration-none {% if request.resolver_match.url_name == 'public_booking' %}fw-bold{% endif %}" 
+                            href="{% url 'public_booking' %}">
+                            <i class="fas fa-home me-2"></i>Inicio
+                         </a>
+                         {% if user.is_authenticated %}
+                             {% if user.is_staff %}
+                                 <a class="text-white text-decoration-none {% if request.resolver_match.url_name == 'dashboard' %}fw-bold{% endif %}" 
+                                    href="{% url 'dashboard' %}">
+                                    <i class="fas fa-th-large me-2"></i>Panel de Control
+                                 </a>
+                                 <a class="text-white text-decoration-none {% if request.resolver_match.url_name == 'staff_availability' %}fw-bold{% endif %}" 
+                                    href="{% url 'staff_availability' %}">
+                                    <i class="fas fa-calendar-alt me-2"></i>Gestionar Disponibilidad
+                                 </a>
+                                 <a class="text-white text-decoration-none {% if request.resolver_match.url_name == 'appointments_crud' %}fw-bold{% endif %}" 
+                                    href="{% url 'appointments_crud' %}">
+                                    <i class="fas fa-calendar-check me-2"></i>Gestionar Citas
+                                 </a>
+                             {% endif %}
+                             <a class="text-white text-decoration-none" href="{% url 'logout' %}">
+                                 <i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión
+                             </a>
+                         {% endif %}
+                     </nav>
+                 </div>
+             </div>
+         </header>
+     
+         <!-- ====================================
+              Part 6: Mobile Header
+              ==================================== -->
+         <nav class="navbar navbar-dark bg-primary d-md-none">
+             <div class="container">
+                 <!-- Mobile Logo -->
+                 <a href="{% url 'public_booking' %}" class="navbar-brand d-flex align-items-center">
+                     <img src="{% static 'visits/images/logo.png' %}" 
+                          alt="Colegio Claretianos Segovia" 
+                          style="height: 48px; width: auto;"
+                          class="me-2">
+                     <span class="h5 mb-0">Reserva tu Visita</span>
+                 </a>
+                 
+                 <!-- Mobile Menu Toggle -->
+                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
+                         aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                     <span class="navbar-toggler-icon"></span>
+                 </button>
+                 
+                 <!-- Mobile Navigation -->
+                 <div class="collapse navbar-collapse mt-2" id="navbarNav">
+                     <ul class="navbar-nav">
+                         <li class="nav-item">
+                             <a class="nav-link {% if request.resolver_match.url_name == 'public_booking' %}active{% endif %}" 
+                                href="{% url 'public_booking' %}">
+                                <i class="fas fa-home me-2"></i>Inicio
+                             </a>
+                         </li>
+                         {% if user.is_authenticated %}
+                             {% if user.is_staff %}
+                                 <li class="nav-item">
+                                     <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" 
+                                        href="{% url 'dashboard' %}">
+                                        <i class="fas fa-th-large me-2"></i>Panel de Control
+                                     </a>
+                                 </li>
+                                 <li class="nav-item">
+                                     <a class="nav-link {% if request.resolver_match.url_name == 'staff_availability' %}active{% endif %}" 
+                                        href="{% url 'staff_availability' %}">
+                                        <i class="fas fa-calendar-alt me-2"></i>Gestionar Disponibilidad
+                                     </a>
+                                 </li>
+                                 <li class="nav-item">
+                                     <a class="nav-link {% if request.resolver_match.url_name == 'appointments_crud' %}active{% endif %}" 
+                                        href="{% url 'appointments_crud' %}">
+                                        <i class="fas fa-calendar-check me-2"></i>Gestionar Citas
+                                     </a>
+                                 </li>
+                             {% endif %}
+                             <li class="nav-item">
+                                 <a class="nav-link" href="{% url 'logout' %}">
+                                     <i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión
+                                 </a>
+                             </li>
+                         {% endif %}
+                     </ul>
+                 </div>
+             </div>
+         </nav>
+     
+         <!-- ====================================
+              Part 7: Main Content
+              ==================================== -->
+         <main class="flex-grow-1">
+             {% block content %}
+             {% endblock %}
+         </main>
+     
+         <!-- ====================================
+              Part 8: Footer
+              ==================================== -->
+         <footer class="bg-primary text-white py-3 mt-4">
+             <div class="container text-center">
+                 <p class="mb-0">
+                     © {% now "Y" %} Colegio Claretianos Segovia - 
+                     <a href="tel:+34921420300" class="footer-link">
+                         <i class="fas fa-phone me-1"></i>921 42 03 00
+                     </a> - 
+                     <a href="https://claretsegovia.es" class="footer-link" target="_blank" rel="noopener">
+                         <i class="fas fa-globe me-1"></i>claretsegovia.es
+                     </a>
+                 </p>
+             </div>
+         </footer>
+     
+         <!-- ====================================
+              Part 9: JavaScript Dependencies
+              ==================================== -->
+         <!-- Core Scripts -->
+         <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+         <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+         <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales/es.js"></script>
+         <!-- Custom Scripts -->
+         {% block extra_js %}{% endblock %}
+     </body>
+     </html>
