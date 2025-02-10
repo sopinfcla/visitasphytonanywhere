@@ -11,6 +11,7 @@ from django.http import JsonResponse
 from django.urls import reverse
 from django.contrib import messages
 from django.utils.timezone import make_aware, get_current_timezone
+from django.db.models import Q  # Añadida esta importación
 
 # Importaciones de Python
 from datetime import datetime, timedelta, time
@@ -189,14 +190,14 @@ def book_appointment(request, stage_id, slot_id):
             )
             
             appointment_end = appointment_datetime + timedelta(minutes=slot.duration)
-            slots_updated = AvailabilitySlot.objects.filter(
+            # Eliminar slots solapados
+            AvailabilitySlot.objects.filter(
                 staff=slot.staff,
-                date=slot.date,
-                is_active=True
+                date=slot.date
             ).filter(
                 start_time__lt=appointment_end.time(),
                 end_time__gt=appointment_datetime.time()
-            ).update(is_active=False)
+            ).delete()
             
             return JsonResponse({
                 'status': 'success',
@@ -268,19 +269,98 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
                 'repeat_type': request.POST.get('repeat_type'),
                 'is_active': True
             }
-            
+
+            # Verificación de solapamientos según el tipo de slot
             if base_slot_data['repeat_type'] == 'weekly':
                 base_slot_data.update({
                     'month': int(request.POST.get('month')),
                     'weekday': int(request.POST.get('weekday'))
                 })
+                
+                # Para slots recurrentes, verificar todos los días del mes que coincidan
+                month = base_slot_data['month']
+                weekday = base_slot_data['weekday']
+                year = datetime.now().year
+                
+                # Obtener todas las fechas del mes que coinciden con el día de la semana
+                month_dates = []
+                c = calendar.monthcalendar(year, month)
+                for week in c:
+                    if week[weekday] != 0:
+                        month_dates.append(datetime(year, month, week[weekday]).date())
+                
+                # Verificar solapamientos para todas las fechas
+                for date_to_check in month_dates:
+                    # Verificar solapamiento con otros slots
+                    overlapping_slots = AvailabilitySlot.objects.filter(
+                        staff=staff_profile,
+                        date=date_to_check,
+                        is_active=True
+                    ).filter(
+                        Q(start_time__lt=end_time) & Q(end_time__gt=start_time)
+                    ).exists()
+
+                    if overlapping_slots:
+                        return JsonResponse({
+                            'error': 'Ya existen slots de disponibilidad que se solapan con este horario'
+                        }, status=400)
+
+                    # Verificar solapamiento con citas
+                    start_datetime = datetime.combine(date_to_check, start_time)
+                    end_datetime = datetime.combine(date_to_check, end_time)
+                    
+                    overlapping_appointments = Appointment.objects.filter(
+                        staff=staff_profile,
+                        date__range=(
+                            make_aware(start_datetime),
+                            make_aware(end_datetime)
+                        )
+                    ).exists()
+
+                    if overlapping_appointments:
+                        return JsonResponse({
+                            'error': 'Hay citas programadas que se solapan con este horario'
+                        }, status=400)
+                    
             else:
+                # Manejo de slots únicos
                 date_str = request.POST.get('date')
                 date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
                 if date_obj < datetime.now().date():
                     return JsonResponse({'error': 'No se pueden crear slots para fechas pasadas'}, status=400)
                 base_slot_data['date'] = date_obj
-            
+
+                # Verificaciones para slots únicos
+                overlapping_slots = AvailabilitySlot.objects.filter(
+                    staff=staff_profile,
+                    date=date_obj,
+                    is_active=True
+                ).filter(
+                    Q(start_time__lt=end_time) & Q(end_time__gt=start_time)
+                ).exists()
+
+                if overlapping_slots:
+                    return JsonResponse({
+                        'error': 'Ya existen slots de disponibilidad que se solapan con este horario'
+                    }, status=400)
+
+                start_datetime = datetime.combine(date_obj, start_time)
+                end_datetime = datetime.combine(date_obj, end_time)
+                
+                overlapping_appointments = Appointment.objects.filter(
+                    staff=staff_profile,
+                    date__range=(
+                        make_aware(start_datetime),
+                        make_aware(end_datetime)
+                    )
+                ).exists()
+
+                if overlapping_appointments:
+                    return JsonResponse({
+                        'error': 'Hay citas programadas que se solapan con este horario'
+                    }, status=400)
+
+            # Crear slots si no hay solapamientos
             created_slots = []
             for stage in staff_profile.allowed_stages.all():
                 base_slot = AvailabilitySlot(**base_slot_data, stage=stage)
@@ -288,13 +368,14 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
                 created = AvailabilitySlot.objects.bulk_create(slots_generated)
                 created_slots.extend(created)
             
+            # Agrupar slots para la respuesta
             grouped_slots = {}
             for slot in created_slots:
                 key = (slot.date, slot.start_time, slot.end_time)
                 if key not in grouped_slots:
                     grouped_slots[key] = {
                         'id': slot.id,
-                        'date': slot.date.strftime('%d/%m/%Y'),
+                        'date': slot.date.strftime('%d/%m/%Y') if slot.date else '',
                         'start_time': slot.start_time.strftime('%H:%M'),
                         'end_time': slot.end_time.strftime('%H:%M'),
                         'duration': slot.duration,
@@ -306,10 +387,18 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
             return JsonResponse({'slots': list(grouped_slots.values())})
             
         except Exception as e:
+            logger.error(f"Error creating availability slots: {str(e)}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)
     
-    def delete(self, request, slot_id):
+    def delete(self, request, slot_id=None):
         try:
+            if not slot_id:
+                data = json.loads(request.body)
+                slot_id = data.get('slot_id')
+                
+            if not slot_id:
+                return JsonResponse({'error': 'No se proporcionó el ID del slot'}, status=400)
+                
             base_slot = get_object_or_404(AvailabilitySlot, id=slot_id, staff=request.user.staffprofile)
             has_appointments = Appointment.objects.filter(
                 staff=base_slot.staff,
@@ -320,6 +409,7 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
             if has_appointments:
                 return JsonResponse({'error': 'No se puede eliminar un slot con citas programadas'}, status=400)
                 
+            # Eliminar todos los slots relacionados para esa fecha y horario
             slots_to_delete = AvailabilitySlot.objects.filter(
                 staff=base_slot.staff,
                 date=base_slot.date,
@@ -330,6 +420,7 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
             return JsonResponse({'status': 'success', 'deleted_count': count})
             
         except Exception as e:
+            logger.error(f"Error deleting slot {slot_id}: {str(e)}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)
 
 # ====================================
@@ -538,7 +629,6 @@ class AppointmentConfirmationView(TemplateView):
             'time': appointment.date.strftime('%H:%M')
         })
         return context
-
 # ====================================
 # Part 8: Appointments CRUD Views 
 # ====================================
@@ -689,13 +779,13 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             if serializer.is_valid():
                 appointment = serializer.save()
                 
-                # Desactivar slots solapados
+                # Eliminar slots solapados
                 AvailabilitySlot.objects.filter(
                     staff=request.user.staffprofile,
                     date=data['date'].date(),
                     start_time__lt=(data['date'] + timedelta(minutes=30)).time(),
                     end_time__gt=(data['date'] - timedelta(minutes=30)).time()
-                ).update(is_active=False)
+                ).delete()
                 
                 logger.info(f"Created appointment: {appointment.id}")
                 return JsonResponse(serializer.data)
@@ -737,13 +827,13 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                 updated_appointment = serializer.save()
                 
                 if 'date' in data:
-                    # Desactivar slots solapados
+                    # Eliminar slots solapados
                     AvailabilitySlot.objects.filter(
                         staff=request.user.staffprofile,
                         date=data['date'].date(),
                         start_time__lt=(data['date'] + timedelta(minutes=30)).time(),
                         end_time__gt=(data['date'] - timedelta(minutes=30)).time()
-                    ).update(is_active=False)
+                    ).delete()
                 
                 logger.info(f"Updated appointment: {appointment_id}")
                 return JsonResponse(serializer.data)
@@ -764,13 +854,6 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             )
             
             # Reactivar slots relacionados
-            AvailabilitySlot.objects.filter(
-                staff=request.user.staffprofile,
-                date=appointment.date.date(),
-                start_time__lt=(appointment.date + timedelta(minutes=30)).time(),
-                end_time__gt=(appointment.date - timedelta(minutes=30)).time()
-            ).update(is_active=True)
-            
             appointment.delete()
             logger.info(f"Deleted appointment: {appointment_id}")
             return JsonResponse({'status': 'success'})
@@ -792,13 +875,13 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             ).exists()
             
             if overlap:
-                # Desactivar slots solapados
+                # Eliminar slots solapados
                 AvailabilitySlot.objects.filter(
                     staff=request.user.staffprofile,
                     date=date.date(),
                     start_time__lt=(date + timedelta(minutes=30)).time(),
                     end_time__gt=(date - timedelta(minutes=30)).time()
-                ).update(is_active=False)
+                ).delete()
                 
             return JsonResponse({'overlap': overlap})
             

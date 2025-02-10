@@ -73,8 +73,10 @@ function initializeDataTable() {
                     draw: d.draw,
                     start: d.start,
                     length: d.length,
-                    order_column: d.order[0].column,
-                    order_dir: d.order[0].dir,
+                    order: [{
+                        column: d.order[0].column,
+                        dir: d.order[0].dir
+                    }],
                     search: d.search.value,
                 };
                 
@@ -91,19 +93,22 @@ function initializeDataTable() {
         },
         columns: [
             { 
-                data: 'date', 
+                data: 'date',
+                orderable: true,
                 render: function (data) {
                     return data ? moment(data).format('DD/MM/YYYY') : '';
                 }
             },
             { 
-                data: 'date', 
+                data: 'date',
+                orderable: true,
                 render: function (data) {
                     return data ? moment(data).format('HH:mm') : '';
                 }
             },
             { 
-                data: 'visitor_name', 
+                data: 'visitor_name',
+                orderable: true,
                 render: function (data, type, row) {
                     return `
                         <div>
@@ -113,17 +118,18 @@ function initializeDataTable() {
                     `;
                 }
             },
-            { data: 'stage_name' },
+            { data: 'stage_name', orderable: true },
             { 
-                data: 'status', 
+                data: 'status',
+                orderable: true,
                 render: function (data) {
                     const status = ESTADO_LABELS[data] || { class: 'bg-secondary', text: data || 'N/A' };
                     return `<span class="badge ${status.class}">${status.text}</span>`;
                 }
             },
             { 
-                data: 'id', 
-                orderable: false, 
+                data: 'id',
+                orderable: false,
                 render: function (data) {
                     return `
                         <div class="btn-group btn-group-sm">
@@ -139,9 +145,28 @@ function initializeDataTable() {
             }
         ],
         language: {
-            url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json'
+            processing: "Procesando...",
+            search: "Buscar:",
+            lengthMenu: "Mostrar _MENU_ registros",
+            info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+            infoEmpty: "Mostrando 0 a 0 de 0 registros",
+            infoFiltered: "(filtrado de _MAX_ registros totales)",
+            infoPostFix: "",
+            loadingRecords: "Cargando...",
+            zeroRecords: "No se encontraron registros",
+            emptyTable: "No hay citas disponibles",
+            paginate: {
+                first: "Primero",
+                previous: "Anterior",
+                next: "Siguiente",
+                last: "Último"
+            },
+            aria: {
+                sortAscending: ": activar para ordenar columna ascendente",
+                sortDescending: ": activar para ordenar columna descendente"
+            }
         },
-        order: [[0, 'desc']]
+        order: [[0, 'desc'], [1, 'desc']]
     });
 
     // Manejar búsqueda con debounce
