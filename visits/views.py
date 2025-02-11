@@ -595,6 +595,17 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             if serializer.is_valid():
                 appointment = serializer.save()
                 logger.info(f"Created appointment: {appointment.id}")
+                
+                # Eliminar slots solapados
+                appointment_end = appointment.date + timedelta(minutes=appointment.duration)
+                AvailabilitySlot.objects.filter(
+                    staff=appointment.staff,
+                    date=appointment.date.date(),
+                    start_time__lt=appointment_end.time(),
+                    end_time__gt=appointment.date.time()
+                ).delete()
+                logger.info(f"Deleted overlapping slots for appointment: {appointment.id}")
+                
                 response_data = serializer.data
                 response_data['duration'] = appointment.duration
                 return JsonResponse(response_data)
@@ -633,7 +644,7 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             # Validar duración
             if 'duration' in data:
                 duration = data['duration']
-                if not isinstance(duration, int) or duration not in [30, 45, 60]:
+                if not isinstance(duration, int) or duration not in [15, 30, 45, 60]:
                     return JsonResponse({'error': 'Duración inválida'}, status=400)
 
             # Verificar solapamientos si la fecha cambia
@@ -653,6 +664,17 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             if serializer.is_valid():
                 updated_appointment = serializer.save()
                 logger.info(f"Updated appointment: {appointment_id}")
+                
+                # Eliminar slots solapados
+                appointment_end = updated_appointment.date + timedelta(minutes=updated_appointment.duration)
+                AvailabilitySlot.objects.filter(
+                    staff=updated_appointment.staff,
+                    date=updated_appointment.date.date(),
+                    start_time__lt=appointment_end.time(),
+                    end_time__gt=updated_appointment.date.time()
+                ).delete()
+                logger.info(f"Deleted overlapping slots for updated appointment: {appointment_id}")
+                
                 response_data = serializer.data
                 response_data['duration'] = updated_appointment.duration
                 return JsonResponse(response_data)

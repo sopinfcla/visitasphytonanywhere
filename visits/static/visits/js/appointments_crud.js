@@ -51,6 +51,9 @@ function initializeStyles() {
     document.head.appendChild(style);
 }
 
+// ====================================
+// DataTable Configuration
+// ====================================
 function initializeDataTable() {
     console.log('Setting up DataTable...');
     
@@ -323,18 +326,6 @@ function loadAppointment(id) {
     });
 }
 
-function cleanupModal() {
-    console.log('Cleaning up modal...');
-    $('#appointmentForm')[0].reset();
-    $('#appointment_id').val('');
-    $('#appointmentForm').validate().resetForm();
-    $('.is-invalid').removeClass('is-invalid');
-    $('body').removeClass('modal-open');
-    $('.modal-backdrop').remove();
-    $('html').removeClass('modal-open');
-    $('body').css('padding-right', '');
-}
-
 function saveAppointment() {
     console.log('Starting saveAppointment...');
     
@@ -355,8 +346,8 @@ function saveAppointment() {
     }
     console.log('Date value:', formData.date);
     
-    // Capturar todos los campos incluyendo duración
-    ['visitor_name', 'visitor_email', 'visitor_phone', 'stage', 'status', 'duration'].forEach(field => {
+    // Capturar todos los campos incluyendo duración y comentarios
+    ['visitor_name', 'visitor_email', 'visitor_phone', 'stage', 'status', 'duration', 'comments'].forEach(field => {
         const value = $(`#${field}`).val();
         if (value !== undefined && value !== null) {
             formData[field] = (field === 'duration') ? parseInt(value) : value;
@@ -364,7 +355,7 @@ function saveAppointment() {
         console.log(`Field ${field}:`, value);
     });
 
-    // ✅ Validación de duración (solo 30, 45 y 60 permitidos)
+    // Validación de duración (solo 30, 45 y 60 permitidos)
     const allowedDurations = [30, 45, 60];
     if (isNaN(formData.duration) || !allowedDurations.includes(formData.duration)) {
         console.log('Invalid duration:', formData.duration);
@@ -414,7 +405,6 @@ function saveAppointment() {
     });
 }
 
-
 function confirmDelete(id) {
     if (confirm('¿Está seguro de que desea eliminar esta cita?')) {
         console.log('Deleting appointment:', id);
@@ -443,6 +433,7 @@ function handleAjaxError(xhr) {
     const message = xhr.responseJSON?.error || 'Ha ocurrido un error';
     showToast(message, 'error');
 }
+
 function showToast(message, type = 'success') {
     console.log(`Showing toast: ${message} (${type})`);
     Toastify({
@@ -450,9 +441,21 @@ function showToast(message, type = 'success') {
         duration: 3000,
         gravity: "top",
         position: "right",
-        style: { background: type === 'success' ? '#198754' : '#dc3545' },  // Corrección aquí
+        style: { background: type === 'success' ? '#198754' : '#dc3545' },
         stopOnFocus: true
     }).showToast();
+}
+
+function cleanupModal() {
+    console.log('Cleaning up modal...');
+    $('#appointmentForm')[0].reset();
+    $('#appointment_id').val('');
+    $('#appointmentForm').validate().resetForm();
+    $('.is-invalid').removeClass('is-invalid');
+    $('body').removeClass('modal-open');
+    $('.modal-backdrop').remove();
+    $('html').removeClass('modal-open');
+    $('body').css('padding-right', '');
 }
 
 function populateForm(data) {
@@ -468,7 +471,7 @@ function populateForm(data) {
         console.log('Date/Time set to:', datetime.format('YYYY-MM-DD HH:mm'));
     }
     
-    ['visitor_name', 'visitor_email', 'visitor_phone', 'stage', 'status', 'duration'].forEach(field => {
+    ['visitor_name', 'visitor_email', 'visitor_phone', 'stage', 'status', 'duration', 'comments'].forEach(field => {
         const value = data[field];
         if (value !== undefined && value !== null) {
             console.log(`Setting ${field} to:`, value);

@@ -30,4 +30,5 @@ urlpatterns = [
     # API Appointments
     path('api/appointments/', views.AppointmentAPIView.as_view(), name='api_appointments'),
     path('api/appointments/<int:appointment_id>/', views.AppointmentAPIView.as_view(), name='api_appointment_detail'),
+
 ]
