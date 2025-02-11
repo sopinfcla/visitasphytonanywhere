@@ -5,37 +5,37 @@ from datetime import datetime, timedelta
 
 class AppointmentSerializer(serializers.ModelSerializer):
     """Serializer for Appointment model with calendar and CRUD functionality"""
-    # Calendar-specific fields
     title = serializers.SerializerMethodField()
     start = serializers.SerializerMethodField()
     end = serializers.SerializerMethodField()
     
-    # CRUD-specific fields
     stage_name = serializers.CharField(source='stage.name', read_only=True)
     fecha_y_hora = serializers.SerializerMethodField()
     status = serializers.CharField(required=False, default='pending')
-    
+
+    # ✅ Clase Meta bien indentada
     class Meta:
         model = Appointment
         fields = [
-            # Base fields
             'id', 'visitor_name', 'visitor_email', 'visitor_phone',
             'stage', 'stage_name', 'status', 'comments', 'staff', 'date',
-            # Calendar fields
+            'duration',  # ✅ Campo agregado correctamente
             'title', 'start', 'end', 'fecha_y_hora'
         ]
-        
+
+    # ✅ Métodos movidos dentro de la clase
     def get_title(self, obj):
         return f"{obj.visitor_name} - {obj.stage.name}"
-        
+
     def get_start(self, obj):
         return obj.date
-        
+
     def get_end(self, obj):
-        return obj.date + timedelta(minutes=30)
+        return obj.date + timedelta(minutes=obj.duration)  # ✅ Ahora usa duration dinámicamente
 
     def get_fecha_y_hora(self, obj):
         return obj.date.strftime('%d/%m/%Y %H:%M')
+
 
 class AvailabilitySlotSerializer(serializers.ModelSerializer):
     time = serializers.SerializerMethodField()

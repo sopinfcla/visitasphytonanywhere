@@ -179,14 +179,16 @@ def book_appointment(request, stage_id, slot_id):
                     'redirect_url': reverse('stage_booking', kwargs={'stage_id': stage_id})
                 }, status=400)
             
+            # Aseguramos capturar la duración del slot y los comentarios
             appointment = Appointment.objects.create(
                 stage=stage,
                 staff=slot.staff,
                 visitor_name=request.POST.get('visitor_name'),
                 visitor_email=request.POST.get('visitor_email'),
                 visitor_phone=phone,
-                comments=request.POST.get('comments', ''),
-                date=appointment_datetime
+                date=appointment_datetime,
+                duration=slot.duration,  # Usamos la duración del slot
+                comments=request.POST.get('comments', '')  # Guardamos los comentarios
             )
             
             appointment_end = appointment_datetime + timedelta(minutes=slot.duration)
@@ -213,6 +215,7 @@ def book_appointment(request, stage_id, slot_id):
         'staff_name': slot.staff.user.get_full_name()
     }
     return render(request, 'visits/book_appointment.html', context)
+
 # ====================================
 # Part 5: Staff Availability
 # ====================================
@@ -479,20 +482,17 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                     id=appointment_id,
                     staff=request.user.staffprofile
                 )
-                return JsonResponse(AppointmentSerializer(appointment).data)
+                serializer = AppointmentSerializer(appointment)
+                response_data = serializer.data
+                response_data['duration'] = appointment.duration
+                return JsonResponse(response_data)
 
-            # Base query
             queryset = Appointment.objects.select_related('stage', 'staff__user').filter(
                 staff=request.user.staffprofile
             )
 
-            # Búsqueda global
-            search = request.GET.get('search')
-            logger.debug(f"Búsqueda recibida: {search}")  # Verifica la cadena de búsqueda recibida
-
+            search = request.GET.get('search', '').strip()
             if search:
-                logger.debug(f"Consulta antes del filtro: {queryset.query}")  # Consulta SQL antes del filtro
-
                 queryset = queryset.filter(
                     Q(visitor_name__icontains=search) |
                     Q(visitor_email__icontains=search) |
@@ -500,10 +500,6 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                     Q(stage__name__icontains=search)
                 )
 
-                logger.debug(f"Consulta después del filtro: {queryset.query}")  # Consulta SQL después del filtro
-
-
-            # Filtros específicos
             stage = request.GET.get('stage')
             date = request.GET.get('date')
             status = request.GET.get('status')
@@ -515,29 +511,23 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             if status:
                 queryset = queryset.filter(status=status)
 
-            # Total records antes de filtrar
             total_records = queryset.count()
-            filtered_records = queryset.count()
-
-            # Ordenación
+            
             order_column = request.GET.get('order[0][column]', '0')
             order_dir = request.GET.get('order[0][dir]', 'desc')
             order_columns = ['date', 'date', 'visitor_name', 'stage__name', 'status']
             
-            # Asegurarse de que el índice de columna es válido
             if order_column and order_column.isdigit():
                 order_col_num = int(order_column)
                 if order_col_num < len(order_columns):
                     order = f"-{order_columns[order_col_num]}" if order_dir == 'desc' else order_columns[order_col_num]
                     queryset = queryset.order_by(order)
 
-            # Paginación
             start = int(request.GET.get('start', 0))
             length = int(request.GET.get('length', 10))
             
             paginated_queryset = queryset[start:start + length]
 
-            # Serializar datos
             appointments = []
             for appointment in paginated_queryset:
                 appointments.append({
@@ -549,17 +539,15 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                     'stage': appointment.stage.id if appointment.stage else None,
                     'stage_name': appointment.stage.name if appointment.stage else '',
                     'status': appointment.status,
-                    'duration': getattr(appointment, 'duration', 30)  # Default 30 min si no existe
+                    'duration': appointment.duration
                 })
 
-            response_data = {
+            return JsonResponse({
                 'draw': int(request.GET.get('draw', 1)),
                 'recordsTotal': total_records,
-                'recordsFiltered': filtered_records,
+                'recordsFiltered': total_records,
                 'data': appointments
-            }
-
-            return JsonResponse(response_data)
+            })
 
         except Exception as e:
             logger.error(f"Error in appointments API: {str(e)}", exc_info=True)
@@ -574,12 +562,24 @@ class AppointmentAPIView(LoginRequiredMixin, View):
     def post(self, request):
         try:
             data = json.loads(request.body)
+            logger.debug(f"Received POST data: {data}")
+
             data['staff'] = request.user.staffprofile.id
             
-            appointment_date = make_aware(datetime.fromisoformat(data['date']))
-            duration = int(data.get('duration', 30))  # duración por defecto 30 min si no se especifica
-            
-            # Verificar solapamientos con otras citas usando la duración especificada
+            try:
+                date_str = data.get('date', '')
+                appointment_date = make_aware(datetime.fromisoformat(date_str))
+                data['date'] = appointment_date
+            except ValueError as e:
+                logger.error(f"Error parsing date: {str(e)}")
+                return JsonResponse({'error': 'Formato de fecha inválido'}, status=400)
+
+            # Validación de duración
+            duration = data.get('duration')
+            if not duration or not isinstance(duration, int) or duration not in [15, 30, 45, 60]:
+                return JsonResponse({'error': 'Duración inválida'}, status=400)
+
+            # Verificar solapamientos
             overlap = Appointment.objects.filter(
                 staff=request.user.staffprofile,
                 date__lt=appointment_date + timedelta(minutes=duration),
@@ -594,21 +594,17 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             serializer = AppointmentSerializer(data=data)
             if serializer.is_valid():
                 appointment = serializer.save()
-                
-                # Eliminar slots de disponibilidad que se solapen
-                AvailabilitySlot.objects.filter(
-                    staff=request.user.staffprofile,
-                    date=appointment_date.date(),
-                    start_time__lt=(appointment_date + timedelta(minutes=duration)).time(),
-                    end_time__gt=appointment_date.time()
-                ).delete()
-                
                 logger.info(f"Created appointment: {appointment.id}")
-                return JsonResponse(serializer.data)
+                response_data = serializer.data
+                response_data['duration'] = appointment.duration
+                return JsonResponse(response_data)
             
             logger.warning(f"Invalid appointment data: {serializer.errors}")
             return JsonResponse(serializer.errors, status=400)
             
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {str(e)}")
+            return JsonResponse({'error': 'Datos JSON inválidos'}, status=400)
         except Exception as e:
             logger.error(f"Error creating appointment: {str(e)}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)
@@ -621,17 +617,31 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                 staff=request.user.staffprofile
             )
             data = json.loads(request.body)
+            logger.debug(f"Received PUT data for appointment {appointment_id}: {data}")
+
             data['staff'] = request.user.staffprofile.id
 
+            # Procesar fecha si se proporciona
             if 'date' in data:
-                appointment_date = make_aware(datetime.fromisoformat(data['date']))
-                duration = int(data.get('duration', appointment.duration or 30))
-                
-                # Verificar solapamientos excluyendo la cita actual
+                try:
+                    appointment_date = make_aware(datetime.fromisoformat(data['date']))
+                    data['date'] = appointment_date
+                except ValueError as e:
+                    logger.error(f"Error parsing date: {str(e)}")
+                    return JsonResponse({'error': 'Formato de fecha inválido'}, status=400)
+
+            # Validar duración
+            if 'duration' in data:
+                duration = data['duration']
+                if not isinstance(duration, int) or duration not in [30, 45, 60]:
+                    return JsonResponse({'error': 'Duración inválida'}, status=400)
+
+            # Verificar solapamientos si la fecha cambia
+            if 'date' in data:
                 overlap = Appointment.objects.filter(
                     staff=request.user.staffprofile,
-                    date__lt=appointment_date + timedelta(minutes=duration),
-                    date__gt=appointment_date - timedelta(minutes=duration)
+                    date__lt=data['date'] + timedelta(minutes=data.get('duration', appointment.duration)),
+                    date__gt=data['date'] - timedelta(minutes=data.get('duration', appointment.duration))
                 ).exclude(id=appointment_id).exists()
 
                 if overlap:
@@ -642,24 +652,19 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             serializer = AppointmentSerializer(appointment, data=data, partial=True)
             if serializer.is_valid():
                 updated_appointment = serializer.save()
-                
-                if 'date' in data:
-                    # Eliminar slots solapados con la nueva fecha
-                    AvailabilitySlot.objects.filter(
-                        staff=request.user.staffprofile,
-                        date=appointment_date.date(),
-                        start_time__lt=(appointment_date + timedelta(minutes=duration)).time(),
-                        end_time__gt=appointment_date.time()
-                    ).delete()
-                
                 logger.info(f"Updated appointment: {appointment_id}")
-                return JsonResponse(serializer.data)
+                response_data = serializer.data
+                response_data['duration'] = updated_appointment.duration
+                return JsonResponse(response_data)
 
-            logger.warning(f"Invalid update data for appointment {appointment_id}: {serializer.errors}")
+            logger.warning(f"Invalid update data: {serializer.errors}")
             return JsonResponse(serializer.errors, status=400)
 
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {str(e)}")
+            return JsonResponse({'error': 'Datos JSON inválidos'}, status=400)
         except Exception as e:
-            logger.error(f"Error updating appointment {appointment_id}: {str(e)}", exc_info=True)
+            logger.error(f"Error updating appointment: {str(e)}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)
 
     def delete(self, request, appointment_id):
@@ -674,7 +679,7 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             return JsonResponse({'status': 'success'})
 
         except Exception as e:
-            logger.error(f"Error deleting appointment {appointment_id}: {str(e)}", exc_info=True)
+            logger.error(f"Error deleting appointment: {str(e)}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)
 
 class PrivacyPolicyView(TemplateView):
@@ -695,6 +700,7 @@ class AppointmentConfirmationView(TemplateView):
             'staff_name': appointment.staff.user.get_full_name(),
             'stage_name': appointment.stage.name,
             'date': appointment.date.strftime('%d/%m/%Y'),
-            'time': appointment.date.strftime('%H:%M')
+            'time': appointment.date.strftime('%H:%M'),
+            'duration': appointment.duration
         })
         return context
