@@ -1,0 +1,23 @@
+<!-- templates/emails/staff_notification.html -->
+{% extends "emails/base_email.html" %}
+{% block content %}
+<div class="header">
+    <h1>Nueva Visita Programada</h1>
+</div>
+<div class="content">
+    <p>Hola {{ staff.get_full_name }},</p>
+    
+    <p>Se ha programado una nueva visita para la etapa de {{ appointment.stage.name }}:</p>
+    
+    <div class="appointment-details">
+        <p><strong>Visitante:</strong> {{ visitor_name }}</p>
+        <p><strong>Email:</strong> {{ visitor_email }}</p>
+        <p><strong>Teléfono:</strong> {{ visitor_phone }}</p>
+        <p><strong>Fecha:</strong> {{ date|date:"l j F Y" }}</p>
+        <p><strong>Hora:</strong> {{ date|date:"H:i" }}</p>
+    </div>
+</div>
+<div class="footer">
+    <p>© {{ year }} Colegio. Todos los derechos reservados.</p>
+</div>
+{% endblock %}

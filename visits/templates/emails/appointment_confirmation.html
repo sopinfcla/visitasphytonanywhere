@@ -1,0 +1,27 @@
+<!-- templates/emails/appointment_confirmation.html -->
+{% extends "emails/base_email.html" %}
+{% block content %}
+<div class="header">
+    <h1>Confirmación de Visita Escolar</h1>
+</div>
+<div class="content">
+    <p>Hola {{ visitor_name }},</p>
+    
+    <p>Tu visita ha sido confirmada con los siguientes detalles:</p>
+    
+    <div class="appointment-details">
+        <p><strong>Etapa:</strong> {{ appointment.stage.name }}</p>
+        <p><strong>Fecha:</strong> {{ date|date:"l j F Y" }}</p>
+        <p><strong>Hora:</strong> {{ date|date:"H:i" }}</p>
+        <p><strong>Personal asignado:</strong> {{ staff }}</p>
+    </div>
+
+    <p>Lugar de encuentro: Recepción del centro</p>
+    
+    <p>Si necesitas modificar o cancelar tu cita, por favor contacta con nosotros respondiendo a este email.</p>
+</div>
+<div class="footer">
+    <p>Este email ha sido enviado automáticamente, por favor no respondas directamente.</p>
+    <p>© {{ year }} Colegio. Todos los derechos reservados.</p>
+</div>
+{% endblock %}

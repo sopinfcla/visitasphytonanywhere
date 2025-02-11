@@ -1,0 +1,26 @@
+<!-- templates/emails/appointment_reminder.html -->
+{% extends "emails/base_email.html" %}
+{% block content %}
+<div class="header">
+    <h1>Recordatorio de Visita</h1>
+</div>
+<div class="content">
+    <p>Hola {{ visitor_name }},</p>
+    
+    <p>Te recordamos que mañana tienes programada una visita:</p>
+    
+    <div class="appointment-details">
+        <p><strong>Etapa:</strong> {{ appointment.stage.name }}</p>
+        <p><strong>Fecha:</strong> {{ date|date:"l j F Y" }}</p>
+        <p><strong>Hora:</strong> {{ date|date:"H:i" }}</p>
+        <p><strong>Personal asignado:</strong> {{ staff }}</p>
+        <p><strong>Lugar:</strong> Recepción del centro</p>
+    </div>
+
+    <p>Si necesitas hacer algún cambio, por favor contáctanos lo antes posible.</p>
+</div>
+<div class="footer">
+    <p>Este email ha sido enviado automáticamente, por favor no respondas directamente.</p>
+    <p>© {{ year }} Colegio. Todos los derechos reservados.</p>
+</div>
+{% endblock %}

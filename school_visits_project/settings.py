@@ -1,5 +1,9 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Cargar variables de entorno
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -20,7 +24,6 @@ INSTALLED_APPS = [
     'visits.apps.VisitsConfig',
 ]
 
-# Configuración de Django Rest Framework
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -89,7 +92,6 @@ TIME_ZONE = 'Europe/Madrid'
 USE_I18N = True
 USE_TZ = True
 
-# Configuración de archivos estáticos
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
@@ -100,7 +102,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 LOGOUT_REDIRECT_URL = '/'
 
-# Configuración de Logging
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -126,7 +127,7 @@ LOGGING = {
         },
     },
     'loggers': {
-        '': {  # Root logger
+        '': {  
             'handlers': ['console', 'file'],
             'level': 'INFO',
         },
@@ -135,7 +136,7 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
-        'visits': {  # App logger
+        'visits': {  
             'handlers': ['console', 'file'],
             'level': 'DEBUG',
             'propagate': False,
@@ -143,13 +144,20 @@ LOGGING = {
     },
 }
 
-# Configuración de Autenticación
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'appointments_crud'
 
-# Configuración de CSRF
 CSRF_TRUSTED_ORIGINS = ['http://localhost:8000']
 
-# Configuración de Sesiones
-SESSION_COOKIE_AGE = 86400  # 24 horas en segundos
+SESSION_COOKIE_AGE = 86400  
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+# Email Configuration
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.office365.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'soporte.informatico@claretsegoviao365.educamos.com'
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = 'soporte.informatico@claretsegoviao365.educamos.com'
+APPOINTMENT_NOTIFICATION_EMAIL = 'soporte.informatico@claretsegoviao365.educamos.com'

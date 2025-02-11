@@ -96,7 +96,6 @@
         </div>
     </div>
 </div>
-
 <!-- Modal Form -->
 <div class="modal fade" id="appointmentModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -166,7 +165,20 @@
                     </div>
                     <div class="mb-3">
                         <label for="comments" class="form-label">Comentarios</label>
-                        <textarea class="form-control" id="comments" name="comments" rows="3"></textarea>
+                        <textarea class="form-control" id="comments" name="comments" rows="2"></textarea>
+                    </div>
+                    <!-- Nuevos campos añadidos -->
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label for="notes" class="form-label">Notas del Profesor</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                      placeholder="Notas internas - no visibles para el visitante"></textarea>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="follow_up_date" class="form-label">Fecha de Seguimiento</label>
+                            <input type="date" class="form-control" id="follow_up_date" name="follow_up_date" 
+                                   min="{{ today }}">
+                        </div>
                     </div>
                 </form>
             </div>

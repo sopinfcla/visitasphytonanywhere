@@ -85,6 +85,9 @@ class Appointment(models.Model):
         choices=STATUS_CHOICES,
         default='pending'
     )
+    notes = models.TextField(blank=True, help_text="Notas internas del profesor")
+    follow_up_date = models.DateField(null=True, blank=True, help_text="Fecha de seguimiento")
+    reminder_sent = models.BooleanField(default=False)
     
     class Meta:
         ordering = ['-date']

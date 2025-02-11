@@ -13,17 +13,15 @@ class AppointmentSerializer(serializers.ModelSerializer):
     fecha_y_hora = serializers.SerializerMethodField()
     status = serializers.CharField(required=False, default='pending')
 
-    # ✅ Clase Meta bien indentada
     class Meta:
         model = Appointment
         fields = [
             'id', 'visitor_name', 'visitor_email', 'visitor_phone',
             'stage', 'stage_name', 'status', 'comments', 'staff', 'date',
-            'duration',  # ✅ Campo agregado correctamente
-            'title', 'start', 'end', 'fecha_y_hora'
+            'duration', 'title', 'start', 'end', 'fecha_y_hora',
+            'notes', 'follow_up_date'  # Nuevos campos añadidos
         ]
 
-    # ✅ Métodos movidos dentro de la clase
     def get_title(self, obj):
         return f"{obj.visitor_name} - {obj.stage.name}"
 
@@ -31,7 +29,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
         return obj.date
 
     def get_end(self, obj):
-        return obj.date + timedelta(minutes=obj.duration)  # ✅ Ahora usa duration dinámicamente
+        return obj.date + timedelta(minutes=obj.duration)
 
     def get_fecha_y_hora(self, obj):
         return obj.date.strftime('%d/%m/%Y %H:%M')

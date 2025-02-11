@@ -356,7 +356,7 @@ function saveAppointment() {
         console.log(`Field ${field}:`, value);
     });
 
-    // Validación de duración
+    // Validación de duración (solo 30, 45 y 60 permitidos)
     const allowedDurations = [30, 45, 60];
     if (isNaN(formData.duration) || !allowedDurations.includes(formData.duration)) {
         console.log('Invalid duration:', formData.duration);
@@ -364,7 +364,6 @@ function saveAppointment() {
         return;
     }
 
-    // Validación de campos requeridos
     if (!formData.date || !formData.visitor_name || !formData.visitor_email || 
         !formData.visitor_phone || !formData.stage || !formData.duration) {
         console.log('Missing required fields:', formData);
@@ -473,18 +472,12 @@ function populateForm(data) {
         console.log('Date/Time set to:', datetime.format('YYYY-MM-DD HH:mm'));
     }
     
-    // Lista completa de campos incluyendo los nuevos
-    ['visitor_name', 'visitor_email', 'visitor_phone', 'stage', 
-     'status', 'duration', 'comments', 'notes', 'follow_up_date'].forEach(field => {
+    ['visitor_name', 'visitor_email', 'visitor_phone', 'stage', 'status', 
+     'duration', 'comments', 'notes', 'follow_up_date'].forEach(field => {
         const value = data[field];
         if (value !== undefined && value !== null) {
             console.log(`Setting ${field} to:`, value);
-            if (field === 'follow_up_date' && value) {
-                // Asegurar formato correcto para fechas
-                $('#follow_up_date').val(moment(value).format('YYYY-MM-DD'));
-            } else {
-                $(`#${field}`).val(field === 'duration' ? value.toString() : value);
-            }
+            $(`#${field}`).val(field === 'duration' ? value.toString() : value);
         } else {
             console.log(`No value for ${field}`);
         }
