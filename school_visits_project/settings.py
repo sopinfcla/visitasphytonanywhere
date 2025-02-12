@@ -100,8 +100,21 @@ STATICFILES_DIRS = [
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-LOGOUT_REDIRECT_URL = '/'
+# Configuración de Autenticación
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'dashboard'
+LOGOUT_REDIRECT_URL = 'public_booking'
 
+# Configuración de Sesiones
+SESSION_COOKIE_AGE = 86400  # 24 horas
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_COOKIE_SECURE = DEBUG is False  # True en producción, False en desarrollo
+SESSION_SAVE_EVERY_REQUEST = True
+
+# Configuración CSRF
+CSRF_TRUSTED_ORIGINS = ['http://localhost:8000']
+
+# Configuración de Logging
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -143,14 +156,6 @@ LOGGING = {
         },
     },
 }
-
-LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'appointments_crud'
-
-CSRF_TRUSTED_ORIGINS = ['http://localhost:8000']
-
-SESSION_COOKIE_AGE = 86400  
-SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
 # Email Configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

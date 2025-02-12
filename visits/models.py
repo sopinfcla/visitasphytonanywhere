@@ -27,6 +27,8 @@ class SchoolStage(models.Model):
 class StaffProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     allowed_stages = models.ManyToManyField(SchoolStage)
+    notify_new_appointment = models.BooleanField(default=True)
+    notify_reminder = models.BooleanField(default=True)
     
     def __str__(self):
         return self.user.get_full_name()

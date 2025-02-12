@@ -1,11 +1,19 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
+from .views import (
+    StaffProfileView,
+    StaffPasswordChangeView,
+    StaffLoginView  # Añadimos nuestra vista personalizada
+)
 
 urlpatterns = [
     # Autenticación
-    path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(next_page='public_booking'), name='logout'),
+    path('login/', StaffLoginView.as_view(), name='login'),
+    path('logout/', auth_views.LogoutView.as_view(
+        next_page='public_booking',
+        template_name=None
+    ), name='logout'),
     
     # Vistas públicas
     path('', views.PublicBookingView.as_view(), name='public_booking'),
@@ -31,4 +39,7 @@ urlpatterns = [
     path('api/appointments/', views.AppointmentAPIView.as_view(), name='api_appointments'),
     path('api/appointments/<int:appointment_id>/', views.AppointmentAPIView.as_view(), name='api_appointment_detail'),
 
+    # Staff Profile Management
+    path('staff/profile/', StaffProfileView.as_view(), name='staff_profile'),
+    path('staff/profile/password/', StaffPasswordChangeView.as_view(), name='staff_password_change'),
 ]

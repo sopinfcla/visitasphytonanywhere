@@ -4,11 +4,12 @@
 
 # Importaciones de Django
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.views import PasswordChangeView, LoginView
 from django.contrib.auth.models import User
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic import TemplateView, View
 from django.http import JsonResponse
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.utils.timezone import make_aware, get_current_timezone
 from django.db.models import Q
@@ -24,8 +25,24 @@ logger = logging.getLogger(__name__)
 # Importaciones locales
 from .models import Appointment, SchoolStage, StaffProfile, AvailabilitySlot
 from .serializers import AppointmentSerializer, AvailabilitySlotSerializer, CalendarDaySerializer
+from .forms import StaffAuthenticationForm
+
+# ====================================
+# Part 1.1: Base Functions
+# ====================================
 
 def is_slot_available(staff, datetime_start, duration):
+    """
+    Comprueba si un slot de tiempo está disponible para un miembro del staff
+    
+    Args:
+        staff (StaffProfile): Perfil del staff a comprobar
+        datetime_start (datetime): Fecha y hora de inicio
+        duration (int): Duración en minutos
+        
+    Returns:
+        bool: True si el slot está disponible, False si no
+    """
     logger.debug(f"Comprobando disponibilidad del slot para el profesor {staff} a partir de {datetime_start} durante {duration} minutos")
     datetime_end = datetime_start + timedelta(minutes=duration)
     
@@ -40,6 +57,40 @@ def is_slot_available(staff, datetime_start, duration):
         return False
 
     return True
+
+# ====================================
+# Part 1.2: Authentication Views
+# ====================================
+
+class StaffLoginView(LoginView):
+    """
+    Vista personalizada para el login del staff que usa un formulario personalizado
+    y maneja la funcionalidad de remember_me
+    """
+    form_class = StaffAuthenticationForm
+    template_name = 'visits/login.html'
+    redirect_authenticated_user = True
+    next_page = reverse_lazy('dashboard')
+    
+    def form_valid(self, form):
+        """Procesa el formulario cuando es válido y maneja el remember_me"""
+        remember_me = form.cleaned_data.get('remember_me', False)
+        if not remember_me:
+            self.request.session.set_expiry(0)
+        return super().form_valid(form)
+    
+    def get_success_url(self):
+        """Determina la URL de redirección tras un login exitoso"""
+        next_url = self.request.GET.get('next')
+        if next_url:
+            return next_url
+        return self.next_page
+    
+    def get_context_data(self, **kwargs):
+        """Añade datos adicionales al contexto del template"""
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Acceso Staff'
+        return context
 
 # ====================================
 # Part 2: Basic Views
@@ -113,6 +164,62 @@ class StageBookingView(TemplateView):
             'stage_json': json.dumps({'id': stage.id, 'name': stage.name, 'description': stage.description})
         })
         return context
+
+class StaffProfileView(LoginRequiredMixin, View):
+    template_name = 'visits/staff_profile.html'
+
+    def get(self, request):
+        if not hasattr(request.user, 'staffprofile'):
+            messages.error(request, 'No tienes un perfil de staff configurado.')
+            return redirect('dashboard')
+        
+        return render(request, self.template_name, {
+            'profile': request.user.staffprofile,
+            'all_stages': SchoolStage.objects.all()
+        })
+
+    def post(self, request):
+        try:
+            profile = request.user.staffprofile
+            user = request.user
+
+            # Actualizar datos de User
+            user.first_name = request.POST.get('first_name', '').strip()
+            user.last_name = request.POST.get('last_name', '').strip()
+            user.email = request.POST.get('email', '').strip()
+
+            if not user.email:
+                raise ValueError('El email es obligatorio')
+
+            # Actualizar notificaciones
+            profile.notify_new_appointment = request.POST.get('notify_new_appointment') == 'on'
+            profile.notify_reminder = request.POST.get('notify_reminder') == 'on'
+
+            # Actualizar etapas permitidas
+            allowed_stages = request.POST.getlist('allowed_stages')
+            profile.allowed_stages.set(allowed_stages)
+
+            user.save()
+            profile.save()
+
+            messages.success(request, 'Perfil actualizado correctamente')
+            return redirect('staff_profile')
+
+        except ValueError as e:
+            messages.error(request, str(e))
+            return redirect('staff_profile')
+        except Exception as e:
+            logger.error(f"Error actualizando perfil: {str(e)}", exc_info=True)
+            messages.error(request, 'Error al actualizar el perfil')
+            return redirect('staff_profile')
+
+class StaffPasswordChangeView(LoginRequiredMixin, PasswordChangeView):
+    template_name = 'visits/staff_password_change.html'
+    success_url = reverse_lazy('staff_profile')
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Contraseña actualizada correctamente')
+        return super().form_valid(form)
 
 def staff_by_stage(request, stage_id):
     logger.debug(f"Obteniendo profesores para la etapa con id {stage_id}")
