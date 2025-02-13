@@ -15,6 +15,8 @@ from django.contrib import messages
 from django.utils.timezone import make_aware, get_current_timezone
 from django.db.models import Q
 from django.db.models.functions import ExtractHour
+from django.utils.timezone import is_naive, make_aware, localtime
+
 
 # Importaciones de Python
 from datetime import datetime, timedelta, time
@@ -849,29 +851,46 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+from django.utils.timezone import is_naive, make_aware, localtime
+from django.http import JsonResponse
+from django.views import View
+from django.contrib.auth.mixins import LoginRequiredMixin
+from datetime import datetime, timedelta
+import logging
+from .models import Appointment
+
+logger = logging.getLogger(__name__)
+
 class DashboardCalendarView(LoginRequiredMixin, View):
     def get(self, request):
         try:
             if not hasattr(request.user, 'staffprofile'):
                 return JsonResponse({'error': 'Perfil no encontrado'}, status=404)
                 
-            # Obtener fechas y convertirlas a aware datetime
+            # Obtener fechas desde los parámetros de la URL
             start_str = request.GET.get('start')
             end_str = request.GET.get('end')
-            
+
             try:
-                # Convertir ISO strings a datetime aware
+                # Convertir ISO strings a datetime
                 start = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
                 end = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
-                
-                # Convertir a la zona horaria del proyecto
-                start = timezone.localtime(timezone.make_aware(start))
-                end = timezone.localtime(timezone.make_aware(end))
+
+                # Solo aplicar make_aware si el datetime es naive
+                if is_naive(start):
+                    start = make_aware(start)
+                if is_naive(end):
+                    end = make_aware(end)
+
+                # Convertir a la zona horaria local
+                start = localtime(start)
+                end = localtime(end)
+
             except ValueError as e:
                 logger.error(f"Error parsing dates: {e}")
                 return JsonResponse({'error': 'Invalid date format'}, status=400)
-            
-            # Obtener citas
+
+            # Obtener citas dentro del rango de fechas
             appointments = (
                 Appointment.objects
                 .filter(
@@ -880,7 +899,8 @@ class DashboardCalendarView(LoginRequiredMixin, View):
                 )
                 .select_related('stage')
             )
-            
+
+            # Formatear los eventos para FullCalendar
             events = []
             for apt in appointments:
                 end_time = apt.date + timedelta(minutes=apt.duration)
@@ -898,12 +918,13 @@ class DashboardCalendarView(LoginRequiredMixin, View):
                         'duration': apt.duration
                     }
                 })
-            
+
             return JsonResponse(events, safe=False)
-            
+
         except Exception as e:
             logger.error(f"Error obteniendo eventos del calendario: {str(e)}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)
+
 
 class DashboardStatsView(LoginRequiredMixin, View):
     def get(self, request):
