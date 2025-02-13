@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block sidebar collapse shadow-sm" style="background: linear-gradient(180deg, #1E1E2D, #252540); color: white;">
+            <div class="position-sticky">
+                <div class="px-4 py-4 text-center border-bottom border-secondary">
+                    <div class="d-flex align-items-center justify-content-center">
+                        <div class="rounded-circle bg-light bg-opacity-25 p-2">
+                            <i class="fas fa-user fa-2x text-light"></i>
+                        </div>
+                    </div>
+                    <h6 class="mt-3 mb-1">{{ user.get_full_name }}</h6>
+                    <span class="badge bg-secondary">Staff</span>
+                </div>
+                <ul class="nav flex-column px-3 mt-3">
+                    <li class="nav-item">
+                        <a class="nav-link py-3 d-flex align-items-center {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}" style="color: white; border-radius: 8px; transition: all 0.3s;">
+                            <i class="fas fa-home fa-fw me-2"></i> Panel Principal
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-3 d-flex align-items-center {% if request.resolver_match.url_name == 'staff_availability' %}active{% endif %}" href="{% url 'staff_availability' %}" style="color: white; border-radius: 8px; transition: all 0.3s;">
+                            <i class="fas fa-calendar-alt fa-fw me-2"></i> Disponibilidad
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-3 d-flex align-items-center {% if request.resolver_match.url_name == 'appointments_crud' %}active{% endif %}" href="{% url 'appointments_crud' %}" style="color: white; border-radius: 8px; transition: all 0.3s;">
+                            <i class="fas fa-calendar-check fa-fw me-2"></i> Gestión de Citas
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-3 d-flex align-items-center {% if request.resolver_match.url_name == 'staff_profile' %}active{% endif %}" href="{% url 'staff_profile' %}" style="color: white; border-radius: 8px; transition: all 0.3s;">
+                            <i class="fas fa-user-cog fa-fw me-2"></i> Mi Perfil
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+        <!-- Main Content -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 bg-light">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-4 pb-3">
+                <h4 class="mb-1">{% block page_title %}{% endblock %}</h4>
+            </div>
+            {% block admin_content %}{% endblock %}
+        </main>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .nav-link:hover, .nav-link.active {
+        background: rgba(255, 255, 255, 0.1);
+        color: #0d6efd !important;
+    }
+    .nav-link i {
+        font-size: 1.2rem;
+    }
+</style>
+{% endblock %}

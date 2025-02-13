@@ -1,5 +1,435 @@
-{% extends 'base.html' %}
+{% extends "admin_base.html" %}
+{% load static %}
 
-{% block content %}
-<h1>Dashboard</h1>
+{% block page_title %}Panel de Control{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item active">Panel Principal</li>
+{% endblock %}
+
+{% block page_actions %}
+<div class="btn-toolbar mb-2 mb-md-0">
+    <div class="btn-group me-2">
+        <button type="button" class="btn btn-sm btn-outline-primary" id="refreshStats">
+            <i class="fas fa-sync-alt me-1"></i>Actualizar
+        </button>
+        <button type="button" class="btn btn-sm btn-primary" id="monthView">
+            <i class="fas fa-calendar-alt me-1"></i>Mes
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block admin_content %}
+<!-- Stats Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0 me-3">
+                        <div class="rounded-circle bg-primary bg-opacity-10 p-3">
+                            <i class="fas fa-calendar-day fa-lg text-primary"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h6 class="text-muted mb-1">Citas Hoy</h6>
+                        <h3 class="mb-0">{{ today_appointments|length }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0 me-3">
+                        <div class="rounded-circle bg-success bg-opacity-10 p-3">
+                            <i class="fas fa-calendar-week fa-lg text-success"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h6 class="text-muted mb-1">Esta Semana</h6>
+                        <h3 class="mb-0">{{ week_appointments|length }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0 me-3">
+                        <div class="rounded-circle bg-info bg-opacity-10 p-3">
+                            <i class="fas fa-calendar-alt fa-lg text-info"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h6 class="text-muted mb-1">Total Mes</h6>
+                        <h3 class="mb-0">{{ month_appointments|length }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0 me-3">
+                        <div class="rounded-circle bg-warning bg-opacity-10 p-3">
+                            <i class="fas fa-clock fa-lg text-warning"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h6 class="text-muted mb-1">Slots Disponibles</h6>
+                        <h3 class="mb-0">{{ available_slots }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Calendar & Upcoming -->
+<div class="row g-3">
+    <!-- Calendar -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Calendario de Citas</h6>
+                    <div class="btn-group" id="calendarViewButtons">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="dayView">
+                            Día
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary active" id="weekView">
+                            Semana
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="monthView">
+                            Mes
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0 position-relative">
+                <div id="calendarLoading" class="position-absolute w-100 h-100 bg-white bg-opacity-75 d-flex justify-content-center align-items-center" style="z-index: 1; display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                </div>
+                <div id="calendar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel Derecho -->
+    <div class="col-lg-4">
+        <!-- Próximas Citas -->
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Próximas Citas</h6>
+                    <a href="{% url 'appointments_crud' %}" class="btn btn-sm btn-outline-primary">
+                        Ver Todas
+                    </a>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for appointment in upcoming_appointments %}
+                    <div class="list-group-item py-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <h6 class="mb-0">{{ appointment.visitor_name }}</h6>
+                            <span class="badge bg-{{ appointment.status_color }}">
+                                {{ appointment.get_status_display }}
+                            </span>
+                        </div>
+                        <div class="small text-muted">
+                            <i class="fas fa-graduation-cap me-1"></i>
+                            {{ appointment.stage.name }}
+                        </div>
+                        <div class="small text-muted mt-1">
+                            <i class="fas fa-calendar me-1"></i>
+                            {{ appointment.date|date:"d/m/Y" }}
+                            <i class="fas fa-clock ms-2 me-1"></i>
+                            {{ appointment.date|date:"H:i" }}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-calendar-times mb-2 h3"></i>
+                        <p class="mb-0">No hay citas programadas</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Resumen por Etapa -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0">Resumen por Etapa</h6>
+            </div>
+            <div class="card-body">
+                <div id="stageStats">
+                    <!-- Contenido dinámico via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Detalle Cita -->
+<div class="modal fade" id="appointmentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalle de Cita</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Contenido dinámico via JS -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cerrar</button>
+                <a href="#" class="btn btn-primary" id="editAppointmentBtn">
+                    <i class="fas fa-edit me-1"></i>Editar
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicialización del calendario
+    const calendarEl = document.getElementById('calendar');
+    
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+        locale: 'es',
+        initialView: 'timeGridWeek',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: ''
+        },
+        height: 600,
+        slotMinTime: '08:00:00',
+        slotMaxTime: '20:00:00',
+        allDaySlot: false,
+        slotDuration: '00:15:00',
+        slotLabelInterval: '01:00',
+        nowIndicator: true,
+        businessHours: {
+            daysOfWeek: [1, 2, 3, 4, 5],
+            startTime: '08:00',
+            endTime: '20:00',
+        },
+        eventTimeFormat: {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        },
+        events: function(fetchInfo, successCallback, failureCallback) {
+            const params = new URLSearchParams({
+                start: fetchInfo.startStr,
+                end: fetchInfo.endStr
+            });
+
+            fetch(`{% url 'dashboard_calendar' %}?${params.toString()}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Error del servidor: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const events = data.map(event => ({
+                        id: event.id,
+                        title: event.title,
+                        start: event.start,
+                        end: event.end,
+                        className: `event-${event.status}`,
+                        extendedProps: {
+                            status: event.status,
+                            stage: event.stage,
+                            visitor_name: event.visitor_name,
+                            visitor_email: event.visitor_email,
+                            visitor_phone: event.visitor_phone,
+                            duration: event.duration
+                        }
+                    }));
+                    successCallback(events);
+                })
+                .catch(error => {
+                    console.error('Error cargando eventos:', error);
+                    failureCallback(error);
+                    // Mostrar mensaje de error
+                    const alertHtml = `
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            Error al cargar los eventos del calendario
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    `;
+                    calendarEl.insertAdjacentHTML('beforebegin', alertHtml);
+                });
+        },
+        eventContent: function(arg) {
+            return {
+                html: `
+                    <div class="fc-event-main-frame">
+                        <div class="fc-event-time">${arg.timeText}</div>
+                        <div class="fc-event-title-container">
+                            <div class="fc-event-title">${arg.event.title}</div>
+                            <div class="small">${arg.event.extendedProps.stage}</div>
+                        </div>
+                    </div>
+                `
+            };
+        },
+        eventClick: function(info) {
+            const event = info.event;
+            const props = event.extendedProps;
+            
+            const modalContent = `
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">${props.visitor_name}</h5>
+                    <span class="badge bg-${getStatusColor(props.status)}">
+                        ${formatStatus(props.status)}
+                    </span>
+                </div>
+                <div class="card bg-light border-0 mb-3">
+                    <div class="card-body">
+                        <p class="mb-2">
+                            <i class="fas fa-graduation-cap me-2"></i>
+                            ${props.stage}
+                        </p>
+                        <p class="mb-2">
+                            <i class="fas fa-calendar me-2"></i>
+                            ${formatDate(event.start)}
+                        </p>
+                        <p class="mb-0">
+                            <i class="fas fa-clock me-2"></i>
+                            ${formatTime(event.start)} (${props.duration} min)
+                        </p>
+                    </div>
+                </div>
+                <div class="list-group">
+                    <a href="mailto:${props.visitor_email}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-envelope me-2"></i>
+                        ${props.visitor_email}
+                    </a>
+                    <a href="tel:${props.visitor_phone}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-phone me-2"></i>
+                        ${props.visitor_phone}
+                    </a>
+                </div>
+            `;
+
+            // Actualizar y mostrar modal
+            const modalBody = document.querySelector('#appointmentModal .modal-body');
+            modalBody.innerHTML = modalContent;
+
+            const editBtn = document.getElementById('editAppointmentBtn');
+            if (editBtn) {
+                editBtn.href = `/appointments/${event.id}/edit`;
+            }
+
+            const modal = new bootstrap.Modal(document.getElementById('appointmentModal'));
+            modal.show();
+        },
+        eventDidMount: function(info) {
+            // Tooltip para eventos
+            new bootstrap.Tooltip(info.el, {
+                title: `${info.event.extendedProps.visitor_name} - ${info.event.extendedProps.stage}`,
+                placement: 'top',
+                trigger: 'hover'
+            });
+        },
+        loading: function(isLoading) {
+            const loadingEl = document.getElementById('calendarLoading');
+            if (loadingEl) {
+                loadingEl.style.display = isLoading ? 'flex' : 'none';
+            }
+        }
+    });
+
+    calendar.render();
+
+    // Manejadores de vista
+    document.getElementById('dayView')?.addEventListener('click', function() {
+        calendar.changeView('timeGridDay');
+        updateActiveButton(this);
+    });
+
+    document.getElementById('weekView')?.addEventListener('click', function() {
+        calendar.changeView('timeGridWeek');
+        updateActiveButton(this);
+    });
+
+    document.getElementById('monthView')?.addEventListener('click', function() {
+        calendar.changeView('dayGridMonth');
+        updateActiveButton(this);
+    });
+
+    // Funciones auxiliares
+    function updateActiveButton(clickedButton) {
+        document.querySelectorAll('.btn-group .btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        clickedButton.classList.add('active');
+    }
+
+    function getStatusColor(status) {
+        return {
+            'pending': 'warning',
+            'confirmed': 'success',
+            'cancelled': 'danger',
+            'completed': 'info'
+        }[status] || 'secondary';
+    }
+
+    function formatStatus(status) {
+        return {
+            'pending': 'Pendiente',
+            'confirmed': 'Confirmada',
+            'cancelled': 'Cancelada',
+            'completed': 'Completada'
+        }[status] || status;
+    }
+
+    function formatDate(date) {
+        return date.toLocaleDateString('es', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    }
+
+    function formatTime(date) {
+        return date.toLocaleTimeString('es', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
+    }
+
+    // Actualizaciones automáticas
+    function refreshDashboard() {
+        calendar.refetchEvents();
+    }
+
+    // Actualizar cada 5 minutos
+    setInterval(refreshDashboard, 300000);
+
+    // Botón de actualización manual
+    document.getElementById('refreshStats')?.addEventListener('click', refreshDashboard);
+});
+</script>
 {% endblock %}

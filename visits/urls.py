@@ -4,7 +4,10 @@ from . import views
 from .views import (
     StaffProfileView,
     StaffPasswordChangeView,
-    StaffLoginView  # Añadimos nuestra vista personalizada
+    StaffLoginView,
+    DashboardView,
+    DashboardStatsView,
+    DashboardCalendarView
 )
 
 urlpatterns = [
@@ -25,7 +28,9 @@ urlpatterns = [
     path('privacy-policy/', views.PrivacyPolicyView.as_view(), name='privacy_policy'),
     
     # Vistas del panel de administración
-    path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
+    path('dashboard/', DashboardView.as_view(), name='dashboard'),
+    path('dashboard/stats/', DashboardStatsView.as_view(), name='dashboard_stats'),
+    path('dashboard/calendar/', DashboardCalendarView.as_view(), name='dashboard_calendar'),
     path('availability/', views.StaffAvailabilityView.as_view(), name='staff_availability'),
     path('appointments/', views.AppointmentsCRUDView.as_view(), name='appointments_crud'),
     
