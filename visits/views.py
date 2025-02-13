@@ -6,6 +6,7 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.views import PasswordChangeView, LoginView
 from django.contrib.auth.models import User
+from django.utils import timezone
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic import TemplateView, View
 from django.http import JsonResponse
@@ -13,6 +14,7 @@ from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.utils.timezone import make_aware, get_current_timezone
 from django.db.models import Q
+from django.db.models.functions import ExtractHour
 
 # Importaciones de Python
 from datetime import datetime, timedelta, time
@@ -847,188 +849,39 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class DashboardView(LoginRequiredMixin, TemplateView):
-    """Vista principal del dashboard para el staff."""
-    template_name = 'visits/dashboard.html'
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        
-        if not hasattr(self.request.user, 'staffprofile'):
-            messages.warning(self.request, 'No tienes un perfil de staff configurado.')
-            return context
-            
-        try:
-            today = datetime.now().date()
-            staff_profile = self.request.user.staffprofile
-            
-            # Obtener todas las citas con optimización de consultas
-            all_appointments = (
-                Appointment.objects
-                .filter(staff=staff_profile)
-                .select_related('stage')
-            )
-            
-            # Citas de hoy
-            today_appointments = all_appointments.filter(
-                date__date=today
-            ).order_by('date')
-            
-            # Citas de la semana (próximos 7 días)
-            week_end = today + timedelta(days=7)
-            week_appointments = all_appointments.filter(
-                date__date__range=[today, week_end]
-            ).order_by('date')
-            
-            # Citas del mes actual
-            month_start = today.replace(day=1)
-            next_month = (month_start + timedelta(days=32)).replace(day=1)
-            month_end = next_month - timedelta(days=1)
-            month_appointments = all_appointments.filter(
-                date__date__range=[month_start, month_end]
-            ).order_by('date')
-            
-            # Slots disponibles próximos 30 días
-            available_slots = AvailabilitySlot.objects.filter(
-                staff=staff_profile,
-                date__gte=today,
-                date__lte=today + timedelta(days=30),
-                is_active=True
-            ).count()
-            
-            # Próximas 5 citas
-            upcoming_appointments = all_appointments.filter(
-                date__gte=datetime.now()
-            ).order_by('date')[:5]
-            
-            # Actualizar contexto
-            context.update({
-                'today_appointments': today_appointments,
-                'week_appointments': week_appointments,
-                'month_appointments': month_appointments,
-                'available_slots': available_slots,
-                'upcoming_appointments': upcoming_appointments,
-                'today_date': today,
-                'current_month': today,
-                'appointments': all_appointments.filter(date__gte=today).order_by('date')
-            })
-            
-        except Exception as e:
-            logger.error(f"Error preparando datos del dashboard: {str(e)}", exc_info=True)
-            messages.error(self.request, 'Error cargando datos del dashboard')
-            
-        return context
-
-class DashboardStatsView(LoginRequiredMixin, View):
-    """API para obtener estadísticas del dashboard."""
-    
-    def get(self, request):
-        if not hasattr(request.user, 'staffprofile'):
-            return JsonResponse({'error': 'Perfil de staff no encontrado'}, status=404)
-            
-        try:
-            staff_profile = request.user.staffprofile
-            today = datetime.now().date()
-            
-            # Estadísticas por etapa educativa
-            stats_by_stage = []
-            for stage in staff_profile.allowed_stages.all():
-                stage_appointments = Appointment.objects.filter(
-                    staff=staff_profile,
-                    stage=stage,
-                    date__date__gte=today
-                )
-                
-                stats_by_stage.append({
-                    'stage_name': stage.name,
-                    'total': stage_appointments.count(),
-                    'pending': stage_appointments.filter(status='pending').count(),
-                    'confirmed': stage_appointments.filter(status='confirmed').count(),
-                    'canceled': stage_appointments.filter(status='canceled').count()
-                })
-            
-            # Análisis de horas más solicitadas
-            popular_hours = (
-                Appointment.objects
-                .filter(staff=staff_profile)
-                .extra({'hour': "EXTRACT(hour FROM date)"})
-                .values('hour')
-                .annotate(count=Count('id'))
-                .order_by('-count')[:5]
-            )
-            
-            # Tasa de confirmación por etapa
-            confirmation_rates = []
-            for stage in staff_profile.allowed_stages.all():
-                total = Appointment.objects.filter(
-                    staff=staff_profile,
-                    stage=stage,
-                    date__date__lt=today
-                ).count()
-                
-                confirmed = Appointment.objects.filter(
-                    staff=staff_profile,
-                    stage=stage,
-                    status='confirmed',
-                    date__date__lt=today
-                ).count()
-                
-                if total > 0:
-                    rate = (confirmed / total) * 100
-                else:
-                    rate = 0
-                    
-                confirmation_rates.append({
-                    'stage_name': stage.name,
-                    'rate': round(rate, 1)
-                })
-            
-            return JsonResponse({
-                'stats_by_stage': stats_by_stage,
-                'popular_hours': list(popular_hours),
-                'confirmation_rates': confirmation_rates
-            })
-            
-        except Exception as e:
-            logger.error(f"Error obteniendo estadísticas: {str(e)}", exc_info=True)
-            return JsonResponse({'error': str(e)}, status=500)
-
 class DashboardCalendarView(LoginRequiredMixin, View):
-    """API para el calendario del dashboard."""
-    
     def get(self, request):
-        if not hasattr(request.user, 'staffprofile'):
-            return JsonResponse({'error': 'Perfil de staff no encontrado'}, status=404)
-            
         try:
-            # Obtener rango de fechas solicitado
-            start = request.GET.get('start')
-            end = request.GET.get('end')
-            
-            if not start or not end:
-                return JsonResponse({'error': 'Rango de fechas requerido'}, status=400)
+            if not hasattr(request.user, 'staffprofile'):
+                return JsonResponse({'error': 'Perfil no encontrado'}, status=404)
                 
-            staff_profile = request.user.staffprofile
+            # Obtener fechas y convertirlas a aware datetime
+            start_str = request.GET.get('start')
+            end_str = request.GET.get('end')
             
-            # Obtener citas en el rango
+            try:
+                # Convertir ISO strings a datetime aware
+                start = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
+                end = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
+                
+                # Convertir a la zona horaria del proyecto
+                start = timezone.localtime(timezone.make_aware(start))
+                end = timezone.localtime(timezone.make_aware(end))
+            except ValueError as e:
+                logger.error(f"Error parsing dates: {e}")
+                return JsonResponse({'error': 'Invalid date format'}, status=400)
+            
+            # Obtener citas
             appointments = (
                 Appointment.objects
                 .filter(
-                    staff=staff_profile,
-                    date__range=[start, end]
+                    staff=request.user.staffprofile,
+                    date__range=(start, end)
                 )
                 .select_related('stage')
             )
             
-            # Formatear eventos para FullCalendar
             events = []
-            status_colors = {
-                'pending': 'primary',
-                'confirmed': 'success',
-                'canceled': 'danger',
-                'completed': 'info'
-            }
-            
             for apt in appointments:
                 end_time = apt.date + timedelta(minutes=apt.duration)
                 events.append({
@@ -1036,18 +889,107 @@ class DashboardCalendarView(LoginRequiredMixin, View):
                     'title': f'{apt.visitor_name} - {apt.stage.name}',
                     'start': apt.date.isoformat(),
                     'end': end_time.isoformat(),
-                    'className': f'bg-{status_colors.get(apt.status, "secondary")}',
                     'extendedProps': {
                         'status': apt.status,
                         'stage': apt.stage.name,
+                        'visitor_name': apt.visitor_name,
                         'visitor_email': apt.visitor_email,
                         'visitor_phone': apt.visitor_phone,
                         'duration': apt.duration
                     }
                 })
-                
+            
             return JsonResponse(events, safe=False)
             
         except Exception as e:
             logger.error(f"Error obteniendo eventos del calendario: {str(e)}", exc_info=True)
+            return JsonResponse({'error': str(e)}, status=500)
+
+class DashboardStatsView(LoginRequiredMixin, View):
+    def get(self, request):
+        try:
+            if not hasattr(request.user, 'staffprofile'):
+                return JsonResponse({'error': 'Perfil no encontrado'}, status=404)
+                
+            staff_profile = request.user.staffprofile
+            today = timezone.now()
+            
+            # Estadísticas por etapa
+            stats_by_stage = []
+            for stage in staff_profile.allowed_stages.all():
+                appointments = Appointment.objects.filter(
+                    staff=staff_profile,
+                    stage=stage,
+                    date__gte=today
+                )
+                
+                stats_by_stage.append({
+                    'stage_name': stage.name,
+                    'total': appointments.count(),
+                    'pending': appointments.filter(status='pending').count(),
+                    'completed': appointments.filter(status='completed').count(),
+                    'cancelled': appointments.filter(status='cancelled').count()
+                })
+            
+            # Próximas citas
+            upcoming = (
+                Appointment.objects
+                .filter(
+                    staff=staff_profile,
+                    date__gte=today
+                )
+                .select_related('stage')
+                .order_by('date')[:5]
+            )
+            
+            # Horas populares usando la zona horaria local
+            popular_hours = (
+                Appointment.objects
+                .filter(staff=staff_profile)
+                .annotate(
+                    hour=ExtractHour('date', tzinfo=timezone.get_current_timezone())
+                )
+                .values('hour')
+                .annotate(count=Count('id'))
+                .order_by('-count')[:5]
+            )
+            
+            # Conteos para stats
+            today_start = timezone.localtime(today).replace(hour=0, minute=0, second=0)
+            today_end = today_start + timedelta(days=1)
+            
+            stats = {
+                'today_count': Appointment.objects.filter(
+                    staff=staff_profile,
+                    date__range=(today_start, today_end)
+                ).count(),
+                'confirmed_count': Appointment.objects.filter(
+                    staff=staff_profile,
+                    status='completed'
+                ).count(),
+                'pending_count': Appointment.objects.filter(
+                    staff=staff_profile,
+                    status='pending'
+                ).count(),
+                'stages_count': staff_profile.allowed_stages.count()
+            }
+            
+            return JsonResponse({
+                'stats_by_stage': stats_by_stage,
+                'popular_hours': list(popular_hours),
+                'upcoming_appointments': [
+                    {
+                        'id': apt.id,
+                        'visitor_name': apt.visitor_name,
+                        'stage': apt.stage.name,
+                        'date': timezone.localtime(apt.date).isoformat(),
+                        'time': timezone.localtime(apt.date).strftime('%H:%M'),
+                        'status': apt.status
+                    } for apt in upcoming
+                ],
+                **stats
+            })
+            
+        except Exception as e:
+            logger.error(f"Error obteniendo estadísticas: {str(e)}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)
