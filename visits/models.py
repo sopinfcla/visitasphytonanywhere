@@ -30,6 +30,8 @@ class StaffProfile(models.Model):
     notify_new_appointment = models.BooleanField(default=True)
     notify_reminder = models.BooleanField(default=True)
     
+    
+    
     def __str__(self):
         return self.user.get_full_name()
 

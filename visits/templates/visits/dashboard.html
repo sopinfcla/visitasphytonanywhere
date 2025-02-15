@@ -169,13 +169,54 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h1 class="h3 mb-0">Panel de Control</h1>
-            <p class="text-muted mb-0">Bienvenido/a, {{ user.get_full_name }}</p>
+            <p class="text-muted mb-0">{{ user.get_full_name }}</p>
         </div>
-        <button type="button" class="btn btn-outline-primary d-flex align-items-center gap-2" id="refreshDashboard">
-            <i class="fas fa-sync-alt"></i>
-            <span>Actualizar</span>
-        </button>
+        <div class="d-flex gap-3 align-items-center">
+            {% if user.is_staff %}
+
+            <div class="card border-0">
+                <div class="card-body p-2">
+                    <select id="viewSelector" class="form-select">
+                        <option value="">Mis Citas</option>
+                        <option value="global">Todas las Citas</option>
+                        {% for staff in staff_list %}
+                            {% if staff.id != user.staffprofile.id %}
+                                <option value="{{ staff.id }}">Citas de {{ staff.user.get_full_name }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            {% endif %}
+            <button type="button" class="btn btn-outline-primary d-flex align-items-center gap-2" id="refreshDashboard">
+                <i class="fas fa-sync-alt"></i>
+                <span>Actualizar</span>
+            </button>
+        </div>
     </div>
+
+    <!-- Después del header y antes de las stats cards -->
+    {% if user.staffprofile.is_staff and user.staffprofile.is_staff %}
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-4">
+                    <label for="staffSelector" class="form-label mb-2">Ver citas de:</label>
+                    <select id="staffSelector" class="form-select">
+                        <option value="">Mis Citas</option>
+                        <option value="global">Todas las Citas</option>
+                        {% for staff in staff_list %}
+                            {% if staff.id != user.staffprofile.id %}
+                                <option value="{{ staff.id }}">{{ staff.user.get_full_name }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
 
     <!-- Stats Cards -->
     <div class="row g-3 mb-4">
@@ -424,11 +465,9 @@
         </div>
     </div>
 </div>
-
 {% endblock %}
 
 {% block extra_js %}
-
 <!-- Required scripts -->
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -458,6 +497,18 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     let calendar, stagesChart, hoursChart;
+    let currentView = '';
+    
+    // Inicializar el selector de vista
+    const viewSelector = document.getElementById('viewSelector');
+    if (viewSelector) {
+        // Recuperar la preferencia guardada
+        const savedView = localStorage.getItem('dashboardView');
+        if (savedView) {
+            viewSelector.value = savedView;
+            currentView = savedView;
+        }
+    }
     
     // Calendar Configuration
     const calendarEl = document.getElementById('calendar');
@@ -492,6 +543,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         start: info.startStr,
                         end: info.endStr
                     });
+
+                    // Añadir parámetro de vista si está seleccionada
+                    if (currentView) {
+                        params.append('staff_id', currentView);
+                    }
 
                     fetch(`{% url 'dashboard_calendar' %}?${params}`)
                         .then(response => {
@@ -543,7 +599,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
             },
             loading: function(isLoading) {
-                // Mostrar/ocultar indicador de carga
                 const loadingEl = document.querySelector('.calendar-loading');
                 if (isLoading) {
                     if (!loadingEl) {
@@ -637,7 +692,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Dashboard Data Management
     const loadDashboardData = async () => {
         try {
-            const response = await fetch('{% url "dashboard_stats" %}');
+            const params = new URLSearchParams();
+            if (currentView) {
+                params.append('staff_id', currentView);
+            }
+            
+            const response = await fetch(`{% url "dashboard_stats" %}?${params}`);
             if (!response.ok) throw new Error('Error cargando datos');
             
             const data = await response.json();
@@ -738,6 +798,15 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // Event Handlers
+    if (viewSelector) {
+        viewSelector.addEventListener('change', function() {
+            currentView = this.value;
+            localStorage.setItem('dashboardView', currentView);
+            loadDashboardData();
+            calendar.refetchEvents();
+        });
+    }
+
     document.getElementById('refreshDashboard')?.addEventListener('click', () => {
         loadDashboardData();
         calendar.refetchEvents();
