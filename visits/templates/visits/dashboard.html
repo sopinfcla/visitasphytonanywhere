@@ -7,6 +7,8 @@
 <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css"/>
 <!-- Bootstrap Icons -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <!-- Toastify CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 <!-- FullCalendar CSS -->
@@ -41,7 +43,7 @@
     border-radius: 12px;
 }
 
-/* Calendar Container */
+/* Calendar Container & Events */
 .calendar-container {
     background: white;
     border-radius: 12px;
@@ -66,10 +68,36 @@
     cursor: pointer;
     border: none;
     font-size: 0.875rem;
+    max-height: none !important;
+    overflow: visible !important;
+}
+.fc .fc-event-main {
+    padding: 2px 4px;
 }
 .fc .fc-event:hover {
     transform: scale(1.02);
     transition: transform 0.2s ease;
+}
+.fc-event-title {
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.fc-event-time {
+    font-size: 0.8em;
+    opacity: 0.8;
+}
+.event-stage-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    margin-top: 2px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
 }
 
 /* Upcoming Appointments */
@@ -100,7 +128,6 @@
     margin-bottom: 1rem;
     border: 1px solid rgba(0,0,0,0.05);
     transition: all 0.3s ease;
-    cursor: pointer;
 }
 .appointment-card:hover {
     transform: translateY(-2px);
@@ -147,6 +174,13 @@
     border-color: var(--primary-color);
     box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.1);
 }
+.modal-readonly .form-control,
+.modal-readonly .form-select,
+.modal-readonly .btn-save {
+    pointer-events: none;
+    background-color: #e9ecef;
+    opacity: 0.8;
+}
 
 /* Responsive Adjustments */
 @media (max-width: 768px) {
@@ -158,6 +192,13 @@
     }
     .calendar-container {
         padding: 0.5rem;
+    }
+    .fc .fc-toolbar {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .fc .fc-toolbar-title {
+        font-size: 1rem;
     }
 }
 </style>
@@ -173,7 +214,6 @@
         </div>
         <div class="d-flex gap-3 align-items-center">
             {% if user.is_staff %}
-
             <div class="card border-0">
                 <div class="card-body p-2">
                     <select id="viewSelector" class="form-select">
@@ -194,29 +234,6 @@
             </button>
         </div>
     </div>
-
-    <!-- Después del header y antes de las stats cards -->
-    {% if user.staffprofile.is_staff and user.staffprofile.is_staff %}
-    <div class="card mb-4">
-        <div class="card-body">
-            <div class="row align-items-center">
-                <div class="col-md-4">
-                    <label for="staffSelector" class="form-label mb-2">Ver citas de:</label>
-                    <select id="staffSelector" class="form-select">
-                        <option value="">Mis Citas</option>
-                        <option value="global">Todas las Citas</option>
-                        {% for staff in staff_list %}
-                            {% if staff.id != user.staffprofile.id %}
-                                <option value="{{ staff.id }}">{{ staff.user.get_full_name }}</option>
-                            {% endif %}
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
 
     <!-- Stats Cards -->
     <div class="row g-3 mb-4">
@@ -243,7 +260,7 @@
                             <i class="fas fa-check-circle"></i>
                         </div>
                         <div>
-                            <h6 class="text-muted mb-1">Confirmadas</h6>
+                            <h6 class="text-muted mb-1">Completadas</h6>
                             <h3 class="mb-0" id="confirmedCount">-</h3>
                         </div>
                     </div>
@@ -339,7 +356,7 @@
     </div>
 </div>
 
-<!-- Modal -->
+<!-- Appointment Modal -->
 <div class="modal fade" id="appointmentModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -350,6 +367,7 @@
             <div class="modal-body">
                 <form id="appointmentForm" novalidate>
                     <input type="hidden" id="appointment_id" name="appointment_id">
+                    <input type="hidden" id="appointment_staff_id" name="staff_id">
                     <div class="mb-3">
                         <label for="visitor_name" class="form-label">Nombre del Visitante</label>
                         <input type="text" class="form-control" id="visitor_name" name="visitor_name" required>
@@ -361,18 +379,15 @@
                     <div class="mb-3">
                         <label for="visitor_phone" class="form-label">Teléfono</label>
                         <input type="text" class="form-control" id="visitor_phone" name="visitor_phone" required 
-                               maxlength="9" pattern="[0-9]{9}" 
-                               oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 9)">
+                               maxlength="9" pattern="[0-9]{9}">
                     </div>
                     <div class="mb-3">
                         <label for="stage" class="form-label">Etapa</label>
                         <select class="form-select" id="stage" name="stage" required>
                             <option value="">Seleccione una etapa</option>
-                            <option value="1">Escuela Infantil</option>
-                            <option value="2">Infantil</option>
-                            <option value="3">Primaria</option>
-                            <option value="4">Secundaria</option>
-                            <option value="5">Bachillerato</option>
+                            {% for stage in user.staffprofile.allowed_stages.all %}
+                                <option value="{{ stage.id }}">{{ stage.name }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <div class="row">
@@ -384,55 +399,9 @@
                             <label for="time" class="form-label">Hora</label>
                             <select class="form-select" id="time" name="time" required>
                                 <option value="">Seleccione una hora</option>
-                                <option value="08:00">08:00</option>
-                                <option value="08:15">08:15</option>
-                                <option value="08:30">08:30</option>
-                                <option value="08:45">08:45</option>
-                                <option value="09:00">09:00</option>
-                                <option value="09:15">09:15</option>
-                                <option value="09:30">09:30</option>
-                                <option value="09:45">09:45</option>
-                                <option value="10:00">10:00</option>
-                                <option value="10:15">10:15</option>
-                                <option value="10:30">10:30</option>
-                                <option value="10:45">10:45</option>
-                                <option value="11:00">11:00</option>
-                                <option value="11:15">11:15</option>
-                                <option value="11:30">11:30</option>
-                                <option value="11:45">11:45</option>
-                                <option value="12:00">12:00</option>
-                                <option value="12:15">12:15</option>
-                                <option value="12:30">12:30</option>
-                                <option value="12:45">12:45</option>
-                                <option value="13:00">13:00</option>
-                                <option value="13:15">13:15</option>
-                                <option value="13:30">13:30</option>
-                                <option value="13:45">13:45</option>
-                                <option value="14:00">14:00</option>
-                                <option value="14:15">14:15</option>
-                                <option value="14:30">14:30</option>
-                                <option value="14:45">14:45</option>
-                                <option value="15:00">15:00</option>
-                                <option value="15:15">15:15</option>
-                                <option value="15:30">15:30</option>
-                                <option value="15:45">15:45</option>
-                                <option value="16:00">16:00</option>
-                                <option value="16:15">16:15</option>
-                                <option value="16:30">16:30</option>
-                                <option value="16:45">16:45</option>
-                                <option value="17:00">17:00</option>
-                                <option value="17:15">17:15</option>
-                                <option value="17:30">17:30</option>
-                                <option value="17:45">17:45</option>
-                                <option value="18:00">18:00</option>
-                                <option value="18:15">18:15</option>
-                                <option value="18:30">18:30</option>
-                                <option value="18:45">18:45</option>
-                                <option value="19:00">19:00</option>
-                                <option value="19:15">19:15</option>
-                                <option value="19:30">19:30</option>
-                                <option value="19:45">19:45</option>
-                                <option value="20:00">20:00</option>
+                                {% for hour in available_hours %}
+                                    <option value="{{ hour.value }}">{{ hour.label }}</option>
+                                {% endfor %}
                             </select>
                         </div>
                         <div class="col-md-3 mb-3">
@@ -448,7 +417,7 @@
                         <label for="status" class="form-label">Estado</label>
                         <select class="form-select" id="status" name="status" required>
                             <option value="pending">Pendiente</option>
-                            <option value="completed">Realizada</option>
+                            <option value="completed">Completada</option>
                             <option value="cancelled">Cancelada</option>
                         </select>
                     </div>
@@ -460,7 +429,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="saveAppointment">Guardar</button>
+                <button type="button" class="btn btn-primary btn-save" id="saveAppointment">Guardar</button>
             </div>
         </div>
     </div>
@@ -487,26 +456,43 @@
     window.APPOINTMENTS_CONFIG = {
         apiUrl: '{% url "api_appointments" %}',
         csrfToken: '{{ csrf_token }}',
-        staffId: '{{ request.user.staffprofile.id }}'
+        staffId: '{{ request.user.staffprofile.id }}',
+        isStaff: {{ request.user.is_staff|yesno:"true,false" }}
     };
 </script>
 
 <!-- Application Scripts -->
-<script src="{% static 'visits/js/appointments_crud.js' %}"></script>
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     let calendar, stagesChart, hoursChart;
     let currentView = '';
     
-    // Inicializar el selector de vista
+    // Función para mostrar notificaciones
+    function showToast(message, type = 'info') {
+        Toastify({
+            text: message,
+            duration: 3000,
+            close: true,
+            gravity: "top",
+            position: "right",
+            backgroundColor: type === 'error' ? "#dc3545" : "#0d6efd",
+        }).showToast();
+    }
+
+    // Verificar permisos de edición
+    function canEditAppointment(appointmentStaffId) {
+        const currentUserId = parseInt(window.APPOINTMENTS_CONFIG.staffId);
+        return window.APPOINTMENTS_CONFIG.isStaff || appointmentStaffId === currentUserId;
+    }
+
+    // Initialize view selector
     const viewSelector = document.getElementById('viewSelector');
     if (viewSelector) {
-        // Recuperar la preferencia guardada
         const savedView = localStorage.getItem('dashboardView');
         if (savedView) {
             viewSelector.value = savedView;
             currentView = savedView;
+            updateViewTitle(currentView);
         }
     }
     
@@ -538,88 +524,195 @@ document.addEventListener('DOMContentLoaded', function() {
                 endTime: '20:00',
             },
             events: function(info, successCallback, failureCallback) {
-                try {
-                    const params = new URLSearchParams({
-                        start: info.startStr,
-                        end: info.endStr
-                    });
+                const params = new URLSearchParams({
+                    start: info.startStr,
+                    end: info.endStr
+                });
 
-                    // Añadir parámetro de vista si está seleccionada
-                    if (currentView) {
-                        params.append('staff_id', currentView);
-                    }
-
-                    fetch(`{% url 'dashboard_calendar' %}?${params}`)
-                        .then(response => {
-                            if (!response.ok) throw new Error('Error en la respuesta del servidor');
-                            return response.json();
-                        })
-                        .then(data => successCallback(data))
-                        .catch(error => {
-                            console.error('Error cargando eventos:', error);
-                            failureCallback(error);
-                            showToast('Error cargando eventos del calendario', 'error');
-                        });
-                } catch (error) {
-                    console.error('Error en la función events:', error);
-                    failureCallback(error);
+                if (currentView) {
+                    params.append('staff_id', currentView);
                 }
+
+                fetch(`{% url 'dashboard_calendar' %}?${params.toString()}`)
+                    .then(response => {
+                        if (!response.ok) throw new Error('Error en la respuesta del servidor');
+                        return response.json();
+                    })
+                    .then(data => successCallback(data))
+                    .catch(error => {
+                        console.error('Error cargando eventos:', error);
+                        failureCallback(error);
+                        showToast('Error cargando eventos del calendario', 'error');
+                    });
             },
             eventClick: function(info) {
-                try {
-                    const appointmentId = info.event.id;
-                    if (appointmentId) {
-                        loadAppointment(appointmentId);
-                    }
-                } catch (error) {
-                    console.error('Error al manejar clic en evento:', error);
-                    showToast('Error al abrir la cita', 'error');
+                const appointmentId = info.event.id;
+                const staffId = parseInt(info.event.extendedProps.staffId);
+                
+                if (!canEditAppointment(staffId)) {
+                    showToast('No tienes permisos para editar esta cita', 'error');
+                    return;
                 }
-            },
-            eventDidMount: function(info) {
-                try {
-                    const title = `${info.event.extendedProps.visitor_name} - ${info.event.extendedProps.stage}`;
-                    new bootstrap.Tooltip(info.el, {
-                        title: title,
-                        placement: 'top',
-                        trigger: 'hover'
-                    });
-                } catch (error) {
-                    console.error('Error al montar evento:', error);
-                }
+                
+                loadAppointment(appointmentId, staffId);
             },
             eventContent: function(arg) {
+                const props = arg.event.extendedProps;
+                const isMonthView = arg.view.type === 'dayGridMonth';
+                
                 return {
                     html: `
                         <div class="fc-content">
-                            <div class="fc-title">${arg.event.extendedProps.visitor_name}</div>
-                            <div class="fc-description small">${arg.event.extendedProps.stage}</div>
+                            <div class="d-flex flex-column">
+                                <div class="fw-bold text-truncate">${props.visitor_name}</div>
+                                <div class="event-stage-badge">${props.stage}</div>
+                                ${!isMonthView ? `
+                                    <div class="small text-muted mt-1">
+                                        ${props.staff_name}
+                                    </div>
+                                ` : ''}
+                                <div class="small">
+                                    <span class="badge bg-${getStatusClass(props.status)}">
+                                        ${getStatusText(props.status)}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     `
                 };
-            },
-            loading: function(isLoading) {
-                const loadingEl = document.querySelector('.calendar-loading');
-                if (isLoading) {
-                    if (!loadingEl) {
-                        const div = document.createElement('div');
-                        div.className = 'calendar-loading position-absolute w-100 h-100 d-flex align-items-center justify-content-center bg-white bg-opacity-75';
-                        div.style.top = '0';
-                        div.style.left = '0';
-                        div.innerHTML = '<div class="spinner-border text-primary" role="status"></div>';
-                        calendarEl.appendChild(div);
-                    }
-                } else {
-                    loadingEl?.remove();
-                }
             }
         });
         
         calendar.render();
     }
 
-    // Charts Configuration
-    const configureStagesChart = () => {
+    // Load Appointment Function
+    function loadAppointment(appointmentId, staffId) {
+        fetch(`${window.APPOINTMENTS_CONFIG.apiUrl}${appointmentId}/`)
+            .then(response => {
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        throw new Error('Cita no encontrada');
+                    }
+                    throw new Error('Error cargando la cita');
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Rellenar el formulario
+                document.getElementById('appointment_id').value = data.id;
+                document.getElementById('appointment_staff_id').value = staffId;
+                document.getElementById('visitor_name').value = data.visitor_name;
+                document.getElementById('visitor_email').value = data.visitor_email;
+                document.getElementById('visitor_phone').value = data.visitor_phone;
+                document.getElementById('stage').value = data.stage;
+                
+                // Formatear la fecha y hora
+                const appointmentDate = new Date(data.date);
+                document.getElementById('date').value = appointmentDate.toISOString().split('T')[0];
+                document.getElementById('time').value = appointmentDate.toTimeString().substr(0, 5);
+                
+                document.getElementById('duration').value = data.duration;
+                document.getElementById('status').value = data.status;
+                document.getElementById('comments').value = data.comments || '';
+
+                // Configurar el modal según los permisos
+                const canEdit = canEditAppointment(staffId);
+                const modalEl = document.getElementById('appointmentModal');
+                modalEl.classList.toggle('modal-readonly', !canEdit);
+                
+                // Mostrar/ocultar botón de guardar
+                document.getElementById('saveAppointment').style.display = canEdit ? 'block' : 'none';
+
+                // Mostrar el modal
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast(error.message, 'error');
+            });
+    }
+
+    // Dashboard Data Management
+    async function loadDashboardData() {
+        try {
+            const params = new URLSearchParams();
+            if (currentView) {
+                params.append('staff_id', currentView);
+            }
+            
+            const response = await fetch(`{% url "dashboard_stats" %}?${params.toString()}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            // Update stats
+            updateStats(data);
+            
+            // Update charts
+            updateCharts(data);
+            
+            // Update upcoming appointments
+            updateUpcomingAppointments(data.upcoming_appointments);
+            
+        } catch (error) {
+            console.error('Error loading dashboard data:', error);
+            showToast('Error cargando datos del dashboard', 'error');
+        }
+    }
+
+    function updateStats(data) {
+        const stats = {
+            'todayCount': data.today_count || '-',
+            'confirmedCount': data.confirmed_count || '-',
+            'pendingCount': data.pending_count || '-',
+            'stagesCount': data.stages_count || '-'
+        };
+        
+        Object.entries(stats).forEach(([id, value]) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        });
+    }
+
+    function updateCharts(data) {
+        if (stagesChart && data.stats_by_stage) {
+            stagesChart.data.labels = data.stats_by_stage.map(s => s.stage_name);
+            stagesChart.data.datasets[0].data = data.stats_by_stage.map(s => s.total);
+            stagesChart.update();
+        }
+
+        if (hoursChart && data.popular_hours) {
+            hoursChart.data.labels = data.popular_hours.map(h => `${h.hour}:00`);
+            hoursChart.data.datasets[0].data = data.popular_hours.map(h => h.count);
+            hoursChart.update();
+        }
+    }
+
+    function updateViewTitle(view) {
+        const titleEl = document.querySelector('h1.h3');
+        if (!titleEl) return;
+        
+        if (view === 'global') {
+            titleEl.textContent = 'Panel de Control - Todas las Citas';
+        } else if (view) {
+            const staffSelect = document.getElementById('viewSelector');
+            const selectedOption = staffSelect.options[staffSelect.selectedIndex];
+            titleEl.textContent = `Panel de Control - ${selectedOption.text}`;
+        } else {
+            titleEl.textContent = 'Panel de Control';
+        }
+    }
+
+    // Initialize charts
+    stagesChart = configureStagesChart();
+    hoursChart = configureHoursChart();
+
+    // Chart Configuration Functions
+    function configureStagesChart() {
         const ctx = document.getElementById('stagesChart')?.getContext('2d');
         if (!ctx) return null;
         
@@ -652,9 +745,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
-    };
+    }
 
-    const configureHoursChart = () => {
+    function configureHoursChart() {
         const ctx = document.getElementById('hoursChart')?.getContext('2d');
         if (!ctx) return null;
         
@@ -683,55 +776,36 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
-    };
+    }
 
-    // Initialize charts
-    stagesChart = configureStagesChart();
-    hoursChart = configureHoursChart();
+    // Utility Functions
+    function formatDate(dateStr) {
+        return new Intl.DateTimeFormat('es', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        }).format(new Date(dateStr));
+    }
 
-    // Dashboard Data Management
-    const loadDashboardData = async () => {
-        try {
-            const params = new URLSearchParams();
-            if (currentView) {
-                params.append('staff_id', currentView);
-            }
-            
-            const response = await fetch(`{% url "dashboard_stats" %}?${params}`);
-            if (!response.ok) throw new Error('Error cargando datos');
-            
-            const data = await response.json();
-            
-            // Update stats
-            document.getElementById('todayCount').textContent = data.today_count || '-';
-            document.getElementById('confirmedCount').textContent = data.confirmed_count || '-';
-            document.getElementById('pendingCount').textContent = data.pending_count || '-';
-            document.getElementById('stagesCount').textContent = data.stages_count || '-';
+    function getStatusClass(status) {
+        return {
+            'pending': 'warning',
+            'completed': 'success',
+            'cancelled': 'danger'
+        }[status] || 'secondary';
+    }
 
-            // Update charts
-            if (stagesChart && data.stats_by_stage) {
-                stagesChart.data.labels = data.stats_by_stage.map(s => s.stage_name);
-                stagesChart.data.datasets[0].data = data.stats_by_stage.map(s => s.total);
-                stagesChart.update();
-            }
-
-            if (hoursChart && data.popular_hours) {
-                hoursChart.data.labels = data.popular_hours.map(h => `${h.hour}:00`);
-                hoursChart.data.datasets[0].data = data.popular_hours.map(h => h.count);
-                hoursChart.update();
-            }
-
-            // Update upcoming appointments
-            updateUpcomingAppointments(data.upcoming_appointments);
-
-        } catch (error) {
-            console.error('Error:', error);
-            showToast('Error cargando datos del dashboard', 'error');
-        }
-    };
+    function getStatusText(status) {
+        return {
+            'pending': 'Pendiente',
+            'completed': 'Completada',
+            'cancelled': 'Cancelada'
+        }[status] || status;
+    }
 
     // Upcoming Appointments
-    const updateUpcomingAppointments = (appointments) => {
+    function updateUpcomingAppointments(appointments) {
         const container = document.getElementById('upcomingAppointments');
         if (!container) return;
 
@@ -745,80 +819,125 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        container.innerHTML = appointments.map(apt => `
-            <div class="appointment-card" onclick="loadAppointment(${apt.id})">
-                <div class="d-flex justify-content-between align-items-start mb-3">
-                    <div>
-                        <h6 class="mb-1">${apt.visitor_name}</h6>
-                        <div class="stage-badge">
-                            <i class="fas fa-graduation-cap me-1"></i>${apt.stage}
+        container.innerHTML = appointments.map(apt => {
+            const canEdit = canEditAppointment(apt.staff_id);
+            return `
+                <div class="appointment-card" ${canEdit ? `onclick="loadAppointment(${apt.id}, ${apt.staff_id})"` : ''} 
+                     style="cursor: ${canEdit ? 'pointer' : 'default'}">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h6 class="mb-1">${apt.visitor_name}</h6>
+                            <div class="stage-badge">
+                                <i class="fas fa-graduation-cap me-1"></i>${apt.stage}
+                            </div>
+                        </div>
+                        <span class="badge bg-${getStatusClass(apt.status)}">
+                            ${getStatusText(apt.status)}
+                        </span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 mt-2">
+                        <div class="time-badge">
+                            <i class="fas fa-clock me-1"></i>${apt.time}
+                        </div>
+                        <div class="text-muted small">
+                            <i class="fas fa-calendar me-1"></i>${formatDate(apt.date)}
                         </div>
                     </div>
-                    <span class="badge bg-${getStatusClass(apt.status)}">
-                        ${getStatusText(apt.status)}
-                    </span>
-                </div>
-                <div class="d-flex align-items-center gap-2 mt-2">
-                    <div class="time-badge">
-                        <i class="fas fa-clock me-1"></i>${apt.time}
-                    </div>
-                    <div class="text-muted small">
-                        <i class="fas fa-calendar me-1"></i>${formatDate(apt.date)}
+                    <div class="text-muted small mt-2">
+                        <i class="fas fa-user me-1"></i>${apt.staff_name}
                     </div>
                 </div>
-            </div>
-        `).join('');
-    };
-
-    // Utility Functions
-    const formatDate = (dateStr) => {
-        const date = new Date(dateStr);
-        return new Intl.DateTimeFormat('es', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        }).format(date);
-    };
-
-    const getStatusClass = (status) => {
-        return {
-            'pending': 'warning',
-            'completed': 'success',
-            'cancelled': 'danger'
-        }[status] || 'secondary';
-    };
-
-    const getStatusText = (status) => {
-        return {
-            'pending': 'Pendiente',
-            'completed': 'Realizada',
-            'cancelled': 'Cancelada'
-        }[status] || status;
-    };
+            `;
+        }).join('');
+    }
 
     // Event Handlers
     if (viewSelector) {
         viewSelector.addEventListener('change', function() {
             currentView = this.value;
             localStorage.setItem('dashboardView', currentView);
+            
+            // Refresh data and calendar
             loadDashboardData();
-            calendar.refetchEvents();
+            if (calendar) {
+                calendar.refetchEvents();
+            }
+            
+            updateViewTitle(currentView);
         });
     }
 
-    document.getElementById('refreshDashboard')?.addEventListener('click', () => {
+    document.getElementById('refreshDashboard')?.addEventListener('click', function() {
         loadDashboardData();
-        calendar.refetchEvents();
+        calendar?.refetchEvents();
+        showToast('Dashboard actualizado');
+    });
+
+    // Save appointment handler
+    document.getElementById('saveAppointment')?.addEventListener('click', async function() {
+        try {
+            const form = document.getElementById('appointmentForm');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const formData = new FormData(form);
+            const appointmentId = formData.get('appointment_id');
+            const date = formData.get('date');
+            const time = formData.get('time');
+
+            const data = {
+                visitor_name: formData.get('visitor_name'),
+                visitor_email: formData.get('visitor_email'),
+                visitor_phone: formData.get('visitor_phone'),
+                stage: formData.get('stage'),
+                date: `${date}T${time}`,
+                duration: parseInt(formData.get('duration')),
+                status: formData.get('status'),
+                comments: formData.get('comments'),
+                staff_id: formData.get('staff_id')
+            };
+
+            const response = await fetch(
+                appointmentId ? `${window.APPOINTMENTS_CONFIG.apiUrl}${appointmentId}/` : window.APPOINTMENTS_CONFIG.apiUrl,
+                {
+                    method: appointmentId ? 'PUT' : 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': window.APPOINTMENTS_CONFIG.csrfToken
+                    },
+                    body: JSON.stringify(data)
+                }
+            );
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Error al guardar la cita');
+            }
+
+            // Actualizar dashboard
+            loadDashboardData();
+            calendar?.refetchEvents();
+            
+            const modal = bootstrap.Modal.getInstance(document.getElementById('appointmentModal'));
+            modal.hide();
+            
+            showToast(appointmentId ? 'Cita actualizada correctamente' : 'Cita creada correctamente');
+
+        } catch (error) {
+            console.error('Error saving appointment:', error);
+            showToast(error.message, 'error');
+        }
     });
 
     // Initialize Dashboard
     loadDashboardData();
     
-    // Auto-refresh cada 5 minutos
+    // Auto-refresh every 5 minutes
     setInterval(() => {
         loadDashboardData();
-        calendar.refetchEvents();
+        calendar?.refetchEvents();
     }, 300000);
 });
 </script>

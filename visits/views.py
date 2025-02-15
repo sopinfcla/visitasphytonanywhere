@@ -16,6 +16,7 @@ from django.utils.timezone import make_aware, get_current_timezone
 from django.db.models import Q
 from django.db.models.functions import ExtractHour
 from django.utils.timezone import is_naive, make_aware, localtime
+from django.middleware.csrf import get_token
 
 
 # Importaciones de Python
@@ -846,7 +847,10 @@ from datetime import datetime, timedelta
 import logging
 from .models import Appointment
 
-logger = logging.getLogger(__name__)
+
+# ====================================
+# Part 7: Dashboard Views
+# ====================================
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'visits/dashboard.html'
@@ -856,9 +860,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         
         if hasattr(self.request.user, 'staffprofile'):
             staff_profile = self.request.user.staffprofile
-            context['is_staff'] = self.request.user.is_staff  # Usamos is_staff en lugar de is_staff
+            context['is_staff'] = self.request.user.is_staff
 
-            # Para administradores, incluir lista de staff
+            # Solo incluir lista de staff para administradores
             if self.request.user.is_staff:
                 context['staff_list'] = StaffProfile.objects.exclude(
                     id=staff_profile.id
@@ -868,14 +872,38 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             context['appointments'] = Appointment.objects.filter(
                 staff=staff_profile
             ).select_related('stage')
+
+            # Generar horas disponibles (8:00 - 20:00)
+            available_hours = []
+            for hour in range(8, 21):
+                for minute in ['00', '15', '30', '45']:
+                    if hour == 20 and minute != '00':
+                        continue
+                    time_str = f"{hour:02d}:{minute}"
+                    available_hours.append({
+                        'value': time_str,
+                        'label': time_str
+                    })
+            context['available_hours'] = available_hours
+            
+            # Añadir configuración JavaScript
+            context['dashboard_config'] = {
+                'isStaff': self.request.user.is_staff,
+                'staffId': staff_profile.id,
+                'csrfToken': get_token(self.request),
+                'apiUrl': reverse('api_appointments'),
+                'calendarUrl': reverse('dashboard_calendar'),
+                'statsUrl': reverse('dashboard_stats')
+            }
         else:
-            context['appointments'] = Appointment.objects.none()
-            context['is_staff'] = False  # Para evitar errores en la plantilla
+            context.update({
+                'appointments': Appointment.objects.none(),
+                'is_staff': False,
+                'available_hours': [],
+                'dashboard_config': {}
+            })
 
         return context
-
-
-    
 
 class DashboardCalendarView(LoginRequiredMixin, View):
     def get(self, request):
@@ -888,55 +916,45 @@ class DashboardCalendarView(LoginRequiredMixin, View):
             start_str = request.GET.get('start')
             end_str = request.GET.get('end')
 
+            # Validar y procesar fechas
             try:
-                # Convertir ISO strings a datetime
-                start = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
-                end = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
-
-                # Solo aplicar make_aware si el datetime es naive
-                if is_naive(start):
-                    start = make_aware(start)
-                if is_naive(end):
-                    end = make_aware(end)
-
-                # Convertir a la zona horaria local
-                start = localtime(start)
-                end = localtime(end)
-
+                start = self._parse_date(start_str)
+                end = self._parse_date(end_str)
             except ValueError as e:
-                logger.error(f"Error parsing dates: {e}")
-                return JsonResponse({'error': 'Invalid date format'}, status=400)
+                return JsonResponse({'error': str(e)}, status=400)
 
-            # Determinar qué citas mostrar basado en permisos y selección
+            # Construir query base
             appointments_query = Appointment.objects.select_related('stage', 'staff__user')
             
+            # Aplicar filtros según permisos
             if staff_profile.user.is_staff:
                 if staff_id == 'global':
-                    # Mostrar todas las citas para vista global
-                    pass
-                elif staff_id:
-                    # Mostrar citas de un staff específico
-                    appointments_query = appointments_query.filter(staff_id=staff_id)
+                    pass  # No filtrar
+                elif staff_id and staff_id.isdigit():
+                    appointments_query = appointments_query.filter(staff_id=int(staff_id))
                 else:
-                    # Mostrar citas propias si no hay selección
                     appointments_query = appointments_query.filter(staff=staff_profile)
             else:
-                # Usuario normal solo ve sus propias citas
                 appointments_query = appointments_query.filter(staff=staff_profile)
 
             # Filtrar por rango de fechas
-            appointments = appointments_query.filter(date__range=(start, end))
+            appointments = appointments_query.filter(
+                date__range=(start, end)
+            ).order_by('date')
 
-            # Formatear los eventos para FullCalendar
+            # Formatear eventos
             events = []
             for apt in appointments:
                 end_time = apt.date + timedelta(minutes=apt.duration)
-                events.append({
+                event = {
                     'id': apt.id,
-                    'title': f'{apt.visitor_name} - {apt.stage.name}',
+                    'title': f'{apt.visitor_name}',
                     'start': apt.date.isoformat(),
                     'end': end_time.isoformat(),
+                    'backgroundColor': self._get_status_color(apt.status),
+                    'borderColor': self._get_status_color(apt.status),
                     'extendedProps': {
+                        'staffId': apt.staff.id,
                         'status': apt.status,
                         'stage': apt.stage.name,
                         'visitor_name': apt.visitor_name,
@@ -945,7 +963,8 @@ class DashboardCalendarView(LoginRequiredMixin, View):
                         'duration': apt.duration,
                         'staff_name': apt.staff.user.get_full_name()
                     }
-                })
+                }
+                events.append(event)
 
             return JsonResponse(events, safe=False)
 
@@ -953,6 +972,21 @@ class DashboardCalendarView(LoginRequiredMixin, View):
             logger.error(f"Error obteniendo eventos del calendario: {str(e)}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)
 
+    def _parse_date(self, date_str):
+        try:
+            date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            if is_naive(date):
+                date = make_aware(date)
+            return localtime(date)
+        except ValueError:
+            raise ValueError('Formato de fecha inválido')
+
+    def _get_status_color(self, status):
+        return {
+            'pending': '#ffc107',
+            'completed': '#198754',
+            'cancelled': '#dc3545',
+        }.get(status, '#6c757d')
 class DashboardStatsView(LoginRequiredMixin, View):
     def get(self, request):
         try:
@@ -962,34 +996,46 @@ class DashboardStatsView(LoginRequiredMixin, View):
             staff_profile = request.user.staffprofile
             staff_id = request.GET.get('staff_id')
             today = timezone.now()
+            today_start = timezone.localtime(today).replace(hour=0, minute=0, second=0)
+            today_end = today_start + timedelta(days=1)
             
-            # Determinar el queryset base según los permisos y selección
-            base_queryset = Appointment.objects
+            # Determinar el queryset base según los permisos
+            base_queryset = Appointment.objects.select_related('stage', 'staff__user')
             
             if staff_profile.user.is_staff:
                 if staff_id == 'global':
-                    # No filtrar por staff para vista global
-                    pass
-                elif staff_id:
-                    # Filtrar por staff específico
-                    base_queryset = base_queryset.filter(staff_id=staff_id)
+                    pass  # No filtrar por staff
+                elif staff_id and staff_id.isdigit():
+                    base_queryset = base_queryset.filter(staff_id=int(staff_id))
                 else:
-                    # Mostrar datos propios si no hay selección
                     base_queryset = base_queryset.filter(staff=staff_profile)
             else:
-                # Usuario normal solo ve sus propias citas
                 base_queryset = base_queryset.filter(staff=staff_profile)
-            
+
+            # Estadísticas
+            stats = {
+                'today_count': base_queryset.filter(
+                    date__range=(today_start, today_end)
+                ).count(),
+                
+                'confirmed_count': base_queryset.filter(
+                    status='completed'
+                ).count(),
+                
+                'pending_count': base_queryset.filter(
+                    status='pending',
+                    date__gte=today_start
+                ).count(),
+                
+                'stages_count': staff_profile.allowed_stages.count()
+            }
+
             # Estadísticas por etapa
             stats_by_stage = []
-            stages_query = SchoolStage.objects.all()
+            stages_queryset = staff_profile.allowed_stages.all() if not staff_profile.user.is_staff else SchoolStage.objects.all()
             
-            for stage in stages_query:
-                appointments = base_queryset.filter(
-                    stage=stage,
-                    date__gte=today
-                )
-                
+            for stage in stages_queryset:
+                appointments = base_queryset.filter(stage=stage)
                 stats_by_stage.append({
                     'stage_name': stage.name,
                     'total': appointments.count(),
@@ -997,18 +1043,11 @@ class DashboardStatsView(LoginRequiredMixin, View):
                     'completed': appointments.filter(status='completed').count(),
                     'cancelled': appointments.filter(status='cancelled').count()
                 })
-            
-            # Próximas citas
-            upcoming = (
-                base_queryset
-                .filter(date__gte=today)
-                .select_related('stage', 'staff__user')
-                .order_by('date')[:5]
-            )
-            
-            # Horas populares usando la zona horaria local
+
+            # Horas más populares
             popular_hours = (
                 base_queryset
+                .filter(date__gte=today_start)
                 .annotate(
                     hour=ExtractHour('date', tzinfo=timezone.get_current_timezone())
                 )
@@ -1016,25 +1055,18 @@ class DashboardStatsView(LoginRequiredMixin, View):
                 .annotate(count=Count('id'))
                 .order_by('-count')[:5]
             )
-            
-            # Conteos para stats
-            today_start = timezone.localtime(today).replace(hour=0, minute=0, second=0)
-            today_end = today_start + timedelta(days=1)
-            
-            stats = {
-                'today_count': base_queryset.filter(
-                    date__range=(today_start, today_end)
-                ).count(),
-                'confirmed_count': base_queryset.filter(
-                    status='completed'
-                ).count(),
-                'pending_count': base_queryset.filter(
+
+            # Próximas citas
+            upcoming = (
+                base_queryset
+                .filter(
+                    date__gte=today,
                     status='pending'
-                ).count(),
-                'stages_count': stages_query.count()
-            }
-            
-            return JsonResponse({
+                )
+                .order_by('date')[:5]
+            )
+
+            response_data = {
                 'stats_by_stage': stats_by_stage,
                 'popular_hours': list(popular_hours),
                 'upcoming_appointments': [
@@ -1049,7 +1081,9 @@ class DashboardStatsView(LoginRequiredMixin, View):
                     } for apt in upcoming
                 ],
                 **stats
-            })
+            }
+
+            return JsonResponse(response_data)
             
         except Exception as e:
             logger.error(f"Error obteniendo estadísticas: {str(e)}", exc_info=True)
