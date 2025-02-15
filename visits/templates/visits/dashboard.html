@@ -14,20 +14,71 @@
 <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.css' rel='stylesheet' />
 <link href='https://cdn.jsdelivr.net/npm/@fullcalendar/timegrid@6.1.10/main.min.css' rel='stylesheet' />
 <style>
+:root {
+    --primary-color: #0d6efd;
+    --success-color: #198754;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --info-color: #0dcaf0;
+}
+
+/* Stats Card Styles */
 .stats-card {
     transition: all 0.3s ease;
+    border-radius: 12px;
+    overflow: hidden;
 }
 .stats-card:hover {
     transform: translateY(-5px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
-.card {
-    border-radius: 10px;
+.stats-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+}
+
+/* Calendar Container */
+.calendar-container {
+    background: white;
+    border-radius: 12px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    margin-bottom: 1.5rem;
+    padding: 1rem;
 }
+.fc {
+    font-family: var(--bs-body-font-family);
+    background: white;
+}
+.fc .fc-toolbar-title {
+    font-size: 1.25rem;
+}
+.fc .fc-button-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+.fc .fc-event {
+    border-radius: 6px;
+    padding: 3px 6px;
+    cursor: pointer;
+    border: none;
+    font-size: 0.875rem;
+}
+.fc .fc-event:hover {
+    transform: scale(1.02);
+    transition: transform 0.2s ease;
+}
+
+/* Upcoming Appointments */
 .upcoming-appointments-wrapper {
     height: calc(100vh - 350px);
     overflow-y: auto;
     padding-right: 10px;
+    scrollbar-width: thin;
+    scrollbar-color: #ccc #f1f1f1;
 }
 .upcoming-appointments-wrapper::-webkit-scrollbar {
     width: 6px;
@@ -40,12 +91,13 @@
     background: #ccc;
     border-radius: 3px;
 }
+
+/* Appointment Cards */
 .appointment-card {
     background: white;
     border-radius: 12px;
     padding: 1.25rem;
     margin-bottom: 1rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
     border: 1px solid rgba(0,0,0,0.05);
     transition: all 0.3s ease;
     cursor: pointer;
@@ -54,55 +106,85 @@
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.08);
 }
-.fc-event {
-    cursor: pointer;
-    border: none !important;
-    padding: 2px 4px;
-}
+
+/* Status Badges */
 .time-badge {
     background: rgba(13, 110, 253, 0.1);
-    color: #0d6efd;
+    color: var(--primary-color);
     padding: 0.25rem 0.75rem;
     border-radius: 20px;
     font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 .stage-badge {
     background: rgba(25, 135, 84, 0.1);
-    color: #198754;
+    color: var(--success-color);
     padding: 0.25rem 0.75rem;
     border-radius: 20px;
     font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
 }
+
+/* Chart Containers */
+.chart-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    height: 100%;
+}
+.chart-container {
+    height: 300px;
+    position: relative;
+}
+
+/* Modal Styles */
 .modal .form-control:focus,
 .modal .form-select:focus {
-    border-color: #0d6efd;
+    border-color: var(--primary-color);
     box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.1);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .stats-card {
+        margin-bottom: 1rem;
+    }
+    .chart-container {
+        height: 250px;
+    }
+    .calendar-container {
+        padding: 0.5rem;
+    }
 }
 </style>
 {% endblock %}
 
-{% block content %}
+{% block admin_content %}
 <div class="container py-4">
     <!-- Page Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0">Panel de Control</h1>
-        <div class="btn-group">
-            <button type="button" class="btn btn-outline-primary" id="refreshDashboard">
-                <i class="fas fa-sync-alt me-1"></i>Actualizar
-            </button>
+        <div>
+            <h1 class="h3 mb-0">Panel de Control</h1>
+            <p class="text-muted mb-0">Bienvenido/a, {{ user.get_full_name }}</p>
         </div>
+        <button type="button" class="btn btn-outline-primary d-flex align-items-center gap-2" id="refreshDashboard">
+            <i class="fas fa-sync-alt"></i>
+            <span>Actualizar</span>
+        </button>
     </div>
 
     <!-- Stats Cards -->
     <div class="row g-3 mb-4">
         <div class="col-sm-6 col-xl-3">
-            <div class="card stats-card h-100 border-0">
+            <div class="card stats-card border-0">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0 me-3">
-                            <div class="rounded-circle bg-primary bg-opacity-10 p-3">
-                                <i class="fas fa-calendar-day fa-lg text-primary"></i>
-                            </div>
+                        <div class="stats-icon bg-primary bg-opacity-10 text-primary me-3">
+                            <i class="fas fa-calendar-day"></i>
                         </div>
                         <div>
                             <h6 class="text-muted mb-1">Citas Hoy</h6>
@@ -113,13 +195,11 @@
             </div>
         </div>
         <div class="col-sm-6 col-xl-3">
-            <div class="card stats-card h-100 border-0">
+            <div class="card stats-card border-0">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0 me-3">
-                            <div class="rounded-circle bg-success bg-opacity-10 p-3">
-                                <i class="fas fa-check-circle fa-lg text-success"></i>
-                            </div>
+                        <div class="stats-icon bg-success bg-opacity-10 text-success me-3">
+                            <i class="fas fa-check-circle"></i>
                         </div>
                         <div>
                             <h6 class="text-muted mb-1">Confirmadas</h6>
@@ -130,13 +210,11 @@
             </div>
         </div>
         <div class="col-sm-6 col-xl-3">
-            <div class="card stats-card h-100 border-0">
+            <div class="card stats-card border-0">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0 me-3">
-                            <div class="rounded-circle bg-warning bg-opacity-10 p-3">
-                                <i class="fas fa-clock fa-lg text-warning"></i>
-                            </div>
+                        <div class="stats-icon bg-warning bg-opacity-10 text-warning me-3">
+                            <i class="fas fa-clock"></i>
                         </div>
                         <div>
                             <h6 class="text-muted mb-1">Pendientes</h6>
@@ -147,13 +225,11 @@
             </div>
         </div>
         <div class="col-sm-6 col-xl-3">
-            <div class="card stats-card h-100 border-0">
+            <div class="card stats-card border-0">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0 me-3">
-                            <div class="rounded-circle bg-info bg-opacity-10 p-3">
-                                <i class="fas fa-graduation-cap fa-lg text-info"></i>
-                            </div>
+                        <div class="stats-icon bg-info bg-opacity-10 text-info me-3">
+                            <i class="fas fa-graduation-cap"></i>
                         </div>
                         <div>
                             <h6 class="text-muted mb-1">Total Etapas</h6>
@@ -166,45 +242,33 @@
     </div>
 
     <!-- Main Content -->
-    <div class="row g-3">
+    <div class="row g-4">
         <!-- Left Column -->
         <div class="col-xl-9">
             <!-- Calendar -->
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0">Calendario de Citas</h6>
-                        <div class="btn-group">
-                            <button type="button" class="btn btn-sm btn-outline-primary" id="dayView">Día</button>
-                            <button type="button" class="btn btn-sm btn-outline-primary active" id="weekView">Semana</button>
-                            <button type="button" class="btn btn-sm btn-outline-primary" id="monthView">Mes</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div id="calendar"></div>
-                </div>
+            <div class="calendar-container">
+                <div id="calendar"></div>
             </div>
 
             <!-- Charts Row -->
-            <div class="row g-3 mt-3">
+            <div class="row g-4">
                 <div class="col-md-6">
-                    <div class="card border-0">
-                        <div class="card-header bg-white py-3">
-                            <h6 class="mb-0">Citas por Etapa</h6>
-                        </div>
+                    <div class="chart-card">
                         <div class="card-body">
-                            <canvas id="stagesChart" height="200"></canvas>
+                            <h5 class="mb-4">Citas por Etapa</h5>
+                            <div class="chart-container">
+                                <canvas id="stagesChart"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-6">
-                    <div class="card border-0">
-                        <div class="card-header bg-white py-3">
-                            <h6 class="mb-0">Horas Más Solicitadas</h6>
-                        </div>
+                    <div class="chart-card">
                         <div class="card-body">
-                            <canvas id="hoursChart" height="200"></canvas>
+                            <h5 class="mb-4">Horas Más Solicitadas</h5>
+                            <div class="chart-container">
+                                <canvas id="hoursChart"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -213,119 +277,172 @@
 
         <!-- Right Column -->
         <div class="col-xl-3">
-            <div class="upcoming-appointments-wrapper">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="mb-0">Próximas Citas</h6>
-                    <a href="{% url 'appointments_crud' %}" class="btn btn-sm btn-outline-primary">
-                        <i class="fas fa-external-link-alt me-1"></i>Ver Todas
-                    </a>
+            <div class="card border-0 h-100">
+                <div class="card-header bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Próximas Citas</h5>
+                        <a href="{% url 'appointments_crud' %}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-external-link-alt me-1"></i>Ver Todas
+                        </a>
+                    </div>
                 </div>
-                <div id="upcomingAppointments">
-                    <!-- Populated via JS -->
+                <div class="card-body p-0">
+                    <div class="upcoming-appointments-wrapper p-3">
+                        <div id="upcomingAppointments">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Appointment Modal -->
+<!-- Modal -->
 <div class="modal fade" id="appointmentModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content border-0">
+        <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Detalles de la Cita</h5>
+                <h5 class="modal-title">Gestionar Cita</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="appointmentForm">
-                    <input type="hidden" name="id" id="appointmentId">
-                    <div class="row g-3">
-                        <!-- Visitor Info -->
-                        <div class="col-md-6">
-                            <label class="form-label">Nombre</label>
-                            <input type="text" class="form-control" name="visitor_name" required>
+                <form id="appointmentForm" novalidate>
+                    <input type="hidden" id="appointment_id" name="appointment_id">
+                    <div class="mb-3">
+                        <label for="visitor_name" class="form-label">Nombre del Visitante</label>
+                        <input type="text" class="form-control" id="visitor_name" name="visitor_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="visitor_email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="visitor_email" name="visitor_email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="visitor_phone" class="form-label">Teléfono</label>
+                        <input type="text" class="form-control" id="visitor_phone" name="visitor_phone" required 
+                               maxlength="9" pattern="[0-9]{9}" 
+                               oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 9)">
+                    </div>
+                    <div class="mb-3">
+                        <label for="stage" class="form-label">Etapa</label>
+                        <select class="form-select" id="stage" name="stage" required>
+                            <option value="">Seleccione una etapa</option>
+                            <option value="1">Escuela Infantil</option>
+                            <option value="2">Infantil</option>
+                            <option value="3">Primaria</option>
+                            <option value="4">Secundaria</option>
+                            <option value="5">Bachillerato</option>
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="date" class="form-label">Fecha</label>
+                            <input type="date" class="form-control" id="date" name="date" required>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Email</label>
-                            <input type="email" class="form-control" name="visitor_email" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Teléfono</label>
-                            <input type="tel" class="form-control" name="visitor_phone" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Etapa</label>
-                            <select class="form-select" name="stage" required>
-                                {% for stage in allowed_stages %}
-                                <option value="{{ stage.id }}">{{ stage.name }}</option>
-                                {% endfor %}
+                        <div class="col-md-3 mb-3">
+                            <label for="time" class="form-label">Hora</label>
+                            <select class="form-select" id="time" name="time" required>
+                                <option value="">Seleccione una hora</option>
+                                <option value="08:00">08:00</option>
+                                <option value="08:15">08:15</option>
+                                <option value="08:30">08:30</option>
+                                <option value="08:45">08:45</option>
+                                <option value="09:00">09:00</option>
+                                <option value="09:15">09:15</option>
+                                <option value="09:30">09:30</option>
+                                <option value="09:45">09:45</option>
+                                <option value="10:00">10:00</option>
+                                <option value="10:15">10:15</option>
+                                <option value="10:30">10:30</option>
+                                <option value="10:45">10:45</option>
+                                <option value="11:00">11:00</option>
+                                <option value="11:15">11:15</option>
+                                <option value="11:30">11:30</option>
+                                <option value="11:45">11:45</option>
+                                <option value="12:00">12:00</option>
+                                <option value="12:15">12:15</option>
+                                <option value="12:30">12:30</option>
+                                <option value="12:45">12:45</option>
+                                <option value="13:00">13:00</option>
+                                <option value="13:15">13:15</option>
+                                <option value="13:30">13:30</option>
+                                <option value="13:45">13:45</option>
+                                <option value="14:00">14:00</option>
+                                <option value="14:15">14:15</option>
+                                <option value="14:30">14:30</option>
+                                <option value="14:45">14:45</option>
+                                <option value="15:00">15:00</option>
+                                <option value="15:15">15:15</option>
+                                <option value="15:30">15:30</option>
+                                <option value="15:45">15:45</option>
+                                <option value="16:00">16:00</option>
+                                <option value="16:15">16:15</option>
+                                <option value="16:30">16:30</option>
+                                <option value="16:45">16:45</option>
+                                <option value="17:00">17:00</option>
+                                <option value="17:15">17:15</option>
+                                <option value="17:30">17:30</option>
+                                <option value="17:45">17:45</option>
+                                <option value="18:00">18:00</option>
+                                <option value="18:15">18:15</option>
+                                <option value="18:30">18:30</option>
+                                <option value="18:45">18:45</option>
+                                <option value="19:00">19:00</option>
+                                <option value="19:15">19:15</option>
+                                <option value="19:30">19:30</option>
+                                <option value="19:45">19:45</option>
+                                <option value="20:00">20:00</option>
                             </select>
                         </div>
-                        
-                        <!-- Appointment Details -->
-                        <div class="col-md-6">
-                            <label class="form-label">Fecha</label>
-                            <input type="date" class="form-control" name="date" required>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Hora</label>
-                            <select class="form-select" name="time" required>
-                                {% for hour in available_hours %}
-                                <option value="{{ hour.value }}">{{ hour.label }}</option>
-                                {% endfor %}
+                        <div class="col-md-3 mb-3">
+                            <label for="duration" class="form-label">Duración</label>
+                            <select class="form-select" id="duration" name="duration" required>
+                                <option value="30">30 minutos</option>
+                                <option value="45">45 minutos</option>
+                                <option value="60" selected>1 hora</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Duración</label>
-                            <select class="form-select" name="duration" required>
-                                <option value="15">15 min</option>
-                                <option value="30">30 min</option>
-                                <option value="45">45 min</option>
-                                <option value="60" selected>60 min</option>
-                            </select>
-                        </div>
-                        
-                        <!-- Notes -->
-                        <div class="col-12">
-                            <label class="form-label">Comentarios</label>
-                            <textarea class="form-control" name="comments" rows="2"></textarea>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Notas Internas</label>
-                            <textarea class="form-control" name="notes" rows="2"></textarea>
-                        </div>
-                        
-                        <!-- Follow-up -->
-                        <div class="col-md-6">
-                            <label class="form-label">Fecha de Seguimiento</label>
-                            <input type="date" class="form-control" name="follow_up_date">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Estado</label>
-                            <select class="form-select" name="status" required>
-                                <option value="pending">Pendiente</option>
-                                <option value="completed">Realizada</option>
-                                <option value="cancelled">Cancelada</option>
-                            </select>
-                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="status" class="form-label">Estado</label>
+                        <select class="form-select" id="status" name="status" required>
+                            <option value="pending">Pendiente</option>
+                            <option value="completed">Realizada</option>
+                            <option value="cancelled">Cancelada</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="comments" class="form-label">Comentarios</label>
+                        <textarea class="form-control" id="comments" name="comments" rows="2"></textarea>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cerrar</button>
-                <button type="button" class="btn btn-danger" id="deleteAppointmentBtn">
-                    <i class="fas fa-trash me-1"></i>Eliminar
-                </button>
-                <button type="button" class="btn btn-primary" id="saveAppointmentBtn">
-                    <i class="fas fa-save me-1"></i>Guardar Cambios
-                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="saveAppointment">Guardar</button>
             </div>
         </div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
+
+<!-- Required scripts -->
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery-validation@1.19.5/dist/jquery.validate.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/main.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/@fullcalendar/timegrid@6.1.10/main.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/@fullcalendar/interaction@6.1.10/main.min.js'></script>
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
 <!-- Global Configuration -->
 <script>
     window.APPOINTMENTS_CONFIG = {
@@ -335,23 +452,14 @@
     };
 </script>
 
-<!-- Required scripts -->
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jquery-validation@1.19.5/dist/jquery.validate.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/main.min.js'></script>
-<script src='https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.10/main.min.js'></script>
-<script src='https://cdn.jsdelivr.net/npm/@fullcalendar/timegrid@6.1.10/main.min.js'></script>
-<script src='https://cdn.jsdelivr.net/npm/@fullcalendar/interaction@6.1.10/main.min.js'></script>
+<!-- Application Scripts -->
 <script src="{% static 'visits/js/appointments_crud.js' %}"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     let calendar, stagesChart, hoursChart;
     
-    // ===============================
     // Calendar Configuration
-    // ===============================
     const calendarEl = document.getElementById('calendar');
     if (calendarEl) {
         calendar = new FullCalendar.Calendar(calendarEl, {
@@ -360,7 +468,12 @@ document.addEventListener('DOMContentLoaded', function() {
             headerToolbar: {
                 left: 'prev,next today',
                 center: 'title',
-                right: ''
+                right: 'timeGridDay,timeGridWeek,dayGridMonth'
+            },
+            views: {
+                timeGridDay: { buttonText: 'Día' },
+                timeGridWeek: { buttonText: 'Semana' },
+                dayGridMonth: { buttonText: 'Mes' }
             },
             height: 650,
             slotMinTime: '08:00:00',
@@ -374,46 +487,88 @@ document.addEventListener('DOMContentLoaded', function() {
                 endTime: '20:00',
             },
             events: function(info, successCallback, failureCallback) {
-                const params = new URLSearchParams({
-                    start: info.startStr,
-                    end: info.endStr
-                });
-
-                fetch(`{% url 'dashboard_calendar' %}?${params}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        successCallback(data);
-                    })
-                    .catch(error => {
-                        console.error('Error cargando eventos:', error);
-                        failureCallback(error);
+                try {
+                    const params = new URLSearchParams({
+                        start: info.startStr,
+                        end: info.endStr
                     });
+
+                    fetch(`{% url 'dashboard_calendar' %}?${params}`)
+                        .then(response => {
+                            if (!response.ok) throw new Error('Error en la respuesta del servidor');
+                            return response.json();
+                        })
+                        .then(data => successCallback(data))
+                        .catch(error => {
+                            console.error('Error cargando eventos:', error);
+                            failureCallback(error);
+                            showToast('Error cargando eventos del calendario', 'error');
+                        });
+                } catch (error) {
+                    console.error('Error en la función events:', error);
+                    failureCallback(error);
+                }
             },
             eventClick: function(info) {
-                const appointmentId = info.event.id;
-                // Usar la función de appointments_crud.js
-                if (typeof showAppointmentModal === 'function') {
-                    showAppointmentModal(appointmentId);
+                try {
+                    const appointmentId = info.event.id;
+                    if (appointmentId) {
+                        loadAppointment(appointmentId);
+                    }
+                } catch (error) {
+                    console.error('Error al manejar clic en evento:', error);
+                    showToast('Error al abrir la cita', 'error');
                 }
             },
             eventDidMount: function(info) {
-                new bootstrap.Tooltip(info.el, {
-                    title: `${info.event.extendedProps.visitor_name} - ${info.event.extendedProps.stage}`,
-                    placement: 'top'
-                });
+                try {
+                    const title = `${info.event.extendedProps.visitor_name} - ${info.event.extendedProps.stage}`;
+                    new bootstrap.Tooltip(info.el, {
+                        title: title,
+                        placement: 'top',
+                        trigger: 'hover'
+                    });
+                } catch (error) {
+                    console.error('Error al montar evento:', error);
+                }
+            },
+            eventContent: function(arg) {
+                return {
+                    html: `
+                        <div class="fc-content">
+                            <div class="fc-title">${arg.event.extendedProps.visitor_name}</div>
+                            <div class="fc-description small">${arg.event.extendedProps.stage}</div>
+                        </div>
+                    `
+                };
+            },
+            loading: function(isLoading) {
+                // Mostrar/ocultar indicador de carga
+                const loadingEl = document.querySelector('.calendar-loading');
+                if (isLoading) {
+                    if (!loadingEl) {
+                        const div = document.createElement('div');
+                        div.className = 'calendar-loading position-absolute w-100 h-100 d-flex align-items-center justify-content-center bg-white bg-opacity-75';
+                        div.style.top = '0';
+                        div.style.left = '0';
+                        div.innerHTML = '<div class="spinner-border text-primary" role="status"></div>';
+                        calendarEl.appendChild(div);
+                    }
+                } else {
+                    loadingEl?.remove();
+                }
             }
         });
         
         calendar.render();
     }
 
-    // ===============================
     // Charts Configuration
-    // ===============================
-    // Stages Chart
-    const stagesCtx = document.getElementById('stagesChart')?.getContext('2d');
-    if (stagesCtx) {
-        stagesChart = new Chart(stagesCtx, {
+    const configureStagesChart = () => {
+        const ctx = document.getElementById('stagesChart')?.getContext('2d');
+        if (!ctx) return null;
+        
+        return new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: [],
@@ -434,17 +589,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 plugins: {
                     legend: {
                         position: 'bottom',
-                        labels: { boxWidth: 12 }
+                        labels: { 
+                            boxWidth: 12,
+                            font: { size: 11 }
+                        }
                     }
                 }
             }
         });
-    }
+    };
 
-    // Hours Chart
-    const hoursCtx = document.getElementById('hoursChart')?.getContext('2d');
-    if (hoursCtx) {
-        hoursChart = new Chart(hoursCtx, {
+    const configureHoursChart = () => {
+        const ctx = document.getElementById('hoursChart')?.getContext('2d');
+        if (!ctx) return null;
+        
+        return new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: [],
@@ -469,11 +628,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
-    }
+    };
 
-    // ===============================
+    // Initialize charts
+    stagesChart = configureStagesChart();
+    hoursChart = configureHoursChart();
+
     // Dashboard Data Management
-    // ===============================
     const loadDashboardData = async () => {
         try {
             const response = await fetch('{% url "dashboard_stats" %}');
@@ -505,13 +666,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         } catch (error) {
             console.error('Error:', error);
-            showAlert('Error cargando datos del dashboard', 'danger');
+            showToast('Error cargando datos del dashboard', 'error');
         }
     };
 
-    // ===============================
     // Upcoming Appointments
-    // ===============================
     const updateUpcomingAppointments = (appointments) => {
         const container = document.getElementById('upcomingAppointments');
         if (!container) return;
@@ -527,7 +686,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         container.innerHTML = appointments.map(apt => `
-            <div class="appointment-card" onclick="showAppointmentModal(${apt.id})">
+            <div class="appointment-card" onclick="loadAppointment(${apt.id})">
                 <div class="d-flex justify-content-between align-items-start mb-3">
                     <div>
                         <h6 class="mb-1">${apt.visitor_name}</h6>
@@ -539,7 +698,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         ${getStatusText(apt.status)}
                     </span>
                 </div>
-                <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2 mt-2">
                     <div class="time-badge">
                         <i class="fas fa-clock me-1"></i>${apt.time}
                     </div>
@@ -551,16 +710,15 @@ document.addEventListener('DOMContentLoaded', function() {
         `).join('');
     };
 
-    // ===============================
     // Utility Functions
-    // ===============================
     const formatDate = (dateStr) => {
-        return new Date(dateStr).toLocaleDateString('es', {
+        const date = new Date(dateStr);
+        return new Intl.DateTimeFormat('es', {
             weekday: 'long',
             year: 'numeric',
             month: 'long',
             day: 'numeric'
-        });
+        }).format(date);
     };
 
     const getStatusClass = (status) => {
@@ -579,52 +737,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }[status] || status;
     };
 
-    const showAlert = (message, type = 'info') => {
-        const alertHtml = `
-            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        `;
-        const container = document.querySelector('.container');
-        if (container) {
-            const wrapper = document.createElement('div');
-            wrapper.innerHTML = alertHtml;
-            container.insertBefore(wrapper.firstChild, container.firstChild);
-            
-            setTimeout(() => {
-                const alert = container.querySelector('.alert');
-                if (alert) {
-                    const bsAlert = new bootstrap.Alert(alert);
-                    bsAlert.close();
-                }
-            }, 5000);
-        }
-    };
-
-    // ===============================
     // Event Handlers
-    // ===============================
-    document.querySelectorAll('#dayView, #weekView, #monthView').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const view = e.target.id.replace('View', '');
-            calendar.changeView(`timeGrid${view.charAt(0).toUpperCase() + view.slice(1)}`);
-            
-            document.querySelectorAll('.btn-group .btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            e.target.classList.add('active');
-        });
-    });
-
     document.getElementById('refreshDashboard')?.addEventListener('click', () => {
         loadDashboardData();
         calendar.refetchEvents();
     });
 
-    // ===============================
     // Initialize Dashboard
-    // ===============================
     loadDashboardData();
     
     // Auto-refresh cada 5 minutos
