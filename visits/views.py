@@ -575,20 +575,31 @@ class AppointmentsCRUDView(LoginRequiredMixin, UserPassesTestMixin, TemplateView
 class AppointmentAPIView(LoginRequiredMixin, View):
     def get(self, request, appointment_id=None):
         try:
+            is_supervisor = request.user.groups.filter(name='Supervisor').exists()
+            
             if appointment_id:
-                appointment = get_object_or_404(
-                    Appointment.objects.select_related('stage'), 
-                    id=appointment_id,
-                    staff=request.user.staffprofile
-                )
+                # Construir query base
+                appointment_query = Appointment.objects.select_related('stage')
+                
+                # Si es supervisor, permitir ver todas las citas
+                if is_supervisor:
+                    appointment = get_object_or_404(appointment_query, id=appointment_id)
+                else:
+                    appointment = get_object_or_404(
+                        appointment_query, 
+                        id=appointment_id,
+                        staff=request.user.staffprofile
+                    )
+                
                 serializer = AppointmentSerializer(appointment)
                 response_data = serializer.data
                 response_data['duration'] = appointment.duration
                 return JsonResponse(response_data)
 
-            queryset = Appointment.objects.select_related('stage', 'staff__user').filter(
-                staff=request.user.staffprofile
-            )
+            # Para listados, usar el mismo enfoque de permisos
+            queryset = Appointment.objects.select_related('stage', 'staff__user')
+            if not is_supervisor:
+                queryset = queryset.filter(staff=request.user.staffprofile)
 
             search = request.GET.get('search', '').strip()
             if search:
@@ -602,6 +613,7 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             stage = request.GET.get('stage')
             date = request.GET.get('date')
             status = request.GET.get('status')
+            staff_id = request.GET.get('staff_id')
 
             if stage:
                 queryset = queryset.filter(stage_id=stage)
@@ -609,6 +621,8 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                 queryset = queryset.filter(date__date=date)
             if status:
                 queryset = queryset.filter(status=status)
+            if staff_id and is_supervisor and staff_id.isdigit():
+                queryset = queryset.filter(staff_id=staff_id)
 
             total_records = queryset.count()
             
@@ -638,7 +652,9 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                     'stage': appointment.stage.id if appointment.stage else None,
                     'stage_name': appointment.stage.name if appointment.stage else '',
                     'status': appointment.status,
-                    'duration': appointment.duration
+                    'duration': appointment.duration,
+                    'staff_id': appointment.staff.id,
+                    'staff_name': appointment.staff.user.get_full_name()
                 })
 
             return JsonResponse({
@@ -663,7 +679,9 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             data = json.loads(request.body)
             logger.debug(f"Received POST data: {data}")
 
-            data['staff'] = request.user.staffprofile.id
+            is_supervisor = request.user.groups.filter(name='Supervisor').exists()
+            if not is_supervisor:
+                data['staff'] = request.user.staffprofile.id
             
             try:
                 date_str = data.get('date', '')
@@ -679,8 +697,9 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                 return JsonResponse({'error': 'Duración inválida'}, status=400)
 
             # Verificar solapamientos
+            staff_id = data.get('staff', request.user.staffprofile.id)
             overlap = Appointment.objects.filter(
-                staff=request.user.staffprofile,
+                staff_id=staff_id,
                 date__lt=appointment_date + timedelta(minutes=duration),
                 date__gt=appointment_date - timedelta(minutes=duration)
             ).exists()
@@ -698,7 +717,7 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                 # Eliminar slots solapados
                 appointment_end = appointment.date + timedelta(minutes=appointment.duration)
                 AvailabilitySlot.objects.filter(
-                    staff=appointment.staff,
+                    staff_id=staff_id,
                     date=appointment.date.date(),
                     start_time__lt=appointment_end.time(),
                     end_time__gt=appointment.date.time()
@@ -721,15 +740,23 @@ class AppointmentAPIView(LoginRequiredMixin, View):
 
     def put(self, request, appointment_id):
         try:
-            appointment = get_object_or_404(
-                Appointment, 
-                id=appointment_id,
-                staff=request.user.staffprofile
-            )
+            is_supervisor = request.user.groups.filter(name='Supervisor').exists()
+            
+            # Permitir que los supervisores editen cualquier cita
+            if is_supervisor:
+                appointment = get_object_or_404(Appointment, id=appointment_id)
+            else:
+                appointment = get_object_or_404(
+                    Appointment, 
+                    id=appointment_id,
+                    staff=request.user.staffprofile
+                )
+
             data = json.loads(request.body)
             logger.debug(f"Received PUT data for appointment {appointment_id}: {data}")
 
-            data['staff'] = request.user.staffprofile.id
+            if not is_supervisor:
+                data['staff'] = request.user.staffprofile.id
 
             # Procesar fecha si se proporciona
             if 'date' in data:
@@ -748,8 +775,9 @@ class AppointmentAPIView(LoginRequiredMixin, View):
 
             # Verificar solapamientos si la fecha cambia
             if 'date' in data:
+                staff_id = data.get('staff', appointment.staff_id)
                 overlap = Appointment.objects.filter(
-                    staff=request.user.staffprofile,
+                    staff_id=staff_id,
                     date__lt=data['date'] + timedelta(minutes=data.get('duration', appointment.duration)),
                     date__gt=data['date'] - timedelta(minutes=data.get('duration', appointment.duration))
                 ).exclude(id=appointment_id).exists()
@@ -767,7 +795,7 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                 # Eliminar slots solapados
                 appointment_end = updated_appointment.date + timedelta(minutes=updated_appointment.duration)
                 AvailabilitySlot.objects.filter(
-                    staff=updated_appointment.staff,
+                    staff_id=staff_id,
                     date=updated_appointment.date.date(),
                     start_time__lt=appointment_end.time(),
                     end_time__gt=updated_appointment.date.time()
@@ -790,11 +818,18 @@ class AppointmentAPIView(LoginRequiredMixin, View):
 
     def delete(self, request, appointment_id):
         try:
-            appointment = get_object_or_404(
-                Appointment, 
-                id=appointment_id,
-                staff=request.user.staffprofile
-            )
+            is_supervisor = request.user.groups.filter(name='Supervisor').exists()
+            
+            # Permitir que los supervisores eliminen cualquier cita
+            if is_supervisor:
+                appointment = get_object_or_404(Appointment, id=appointment_id)
+            else:
+                appointment = get_object_or_404(
+                    Appointment, 
+                    id=appointment_id,
+                    staff=request.user.staffprofile
+                )
+
             appointment.delete()
             logger.info(f"Deleted appointment: {appointment_id}")
             return JsonResponse({'status': 'success'})
@@ -860,10 +895,11 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         
         if hasattr(self.request.user, 'staffprofile'):
             staff_profile = self.request.user.staffprofile
-            context['is_staff'] = self.request.user.is_staff
-
-            # Solo incluir lista de staff para administradores
-            if self.request.user.is_staff:
+            # Verificar si el usuario pertenece al grupo Supervisor
+            is_supervisor = self.request.user.groups.filter(name='Supervisor').exists()
+            
+            # Solo incluir lista de staff para supervisores
+            if is_supervisor:
                 context['staff_list'] = StaffProfile.objects.exclude(
                     id=staff_profile.id
                 ).select_related('user').all()
@@ -887,18 +923,21 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             context['available_hours'] = available_hours
             
             # Añadir configuración JavaScript
-            context['dashboard_config'] = {
-                'isStaff': self.request.user.is_staff,
-                'staffId': staff_profile.id,
-                'csrfToken': get_token(self.request),
-                'apiUrl': reverse('api_appointments'),
-                'calendarUrl': reverse('dashboard_calendar'),
-                'statsUrl': reverse('dashboard_stats')
-            }
+            context.update({
+                'is_supervisor': is_supervisor,
+                'dashboard_config': {
+                    'isSupervisor': is_supervisor,
+                    'staffId': staff_profile.id,
+                    'csrfToken': get_token(self.request),
+                    'apiUrl': reverse('api_appointments'),
+                    'calendarUrl': reverse('dashboard_calendar'),
+                    'statsUrl': reverse('dashboard_stats')
+                }
+            })
         else:
             context.update({
                 'appointments': Appointment.objects.none(),
-                'is_staff': False,
+                'is_supervisor': False,
                 'available_hours': [],
                 'dashboard_config': {}
             })
@@ -915,6 +954,7 @@ class DashboardCalendarView(LoginRequiredMixin, View):
             staff_id = request.GET.get('staff_id')
             start_str = request.GET.get('start')
             end_str = request.GET.get('end')
+            is_supervisor = request.user.groups.filter(name='Supervisor').exists()
 
             # Validar y procesar fechas
             try:
@@ -927,7 +967,7 @@ class DashboardCalendarView(LoginRequiredMixin, View):
             appointments_query = Appointment.objects.select_related('stage', 'staff__user')
             
             # Aplicar filtros según permisos
-            if staff_profile.user.is_staff:
+            if is_supervisor:
                 if staff_id == 'global':
                     pass  # No filtrar
                 elif staff_id and staff_id.isdigit():
@@ -987,6 +1027,7 @@ class DashboardCalendarView(LoginRequiredMixin, View):
             'completed': '#198754',
             'cancelled': '#dc3545',
         }.get(status, '#6c757d')
+
 class DashboardStatsView(LoginRequiredMixin, View):
     def get(self, request):
         try:
@@ -995,6 +1036,8 @@ class DashboardStatsView(LoginRequiredMixin, View):
                 
             staff_profile = request.user.staffprofile
             staff_id = request.GET.get('staff_id')
+            is_supervisor = request.user.groups.filter(name='Supervisor').exists()
+            
             today = timezone.now()
             today_start = timezone.localtime(today).replace(hour=0, minute=0, second=0)
             today_end = today_start + timedelta(days=1)
@@ -1002,9 +1045,9 @@ class DashboardStatsView(LoginRequiredMixin, View):
             # Determinar el queryset base según los permisos
             base_queryset = Appointment.objects.select_related('stage', 'staff__user')
             
-            if staff_profile.user.is_staff:
+            if is_supervisor:
                 if staff_id == 'global':
-                    pass  # No filtrar por staff
+                    pass  # No filtrar
                 elif staff_id and staff_id.isdigit():
                     base_queryset = base_queryset.filter(staff_id=int(staff_id))
                 else:
@@ -1030,9 +1073,9 @@ class DashboardStatsView(LoginRequiredMixin, View):
                 'stages_count': staff_profile.allowed_stages.count()
             }
 
-            # Estadísticas por etapa
+            # Estadísticas por etapa 
             stats_by_stage = []
-            stages_queryset = staff_profile.allowed_stages.all() if not staff_profile.user.is_staff else SchoolStage.objects.all()
+            stages_queryset = staff_profile.allowed_stages.all() if not is_supervisor else SchoolStage.objects.all()
             
             for stage in stages_queryset:
                 appointments = base_queryset.filter(stage=stage)

@@ -214,19 +214,19 @@
         </div>
         <div class="d-flex gap-3 align-items-center">
             {% if user.is_staff %}
-            <div class="card border-0">
-                <div class="card-body p-2">
-                    <select id="viewSelector" class="form-select">
-                        <option value="">Mis Citas</option>
-                        <option value="global">Todas las Citas</option>
-                        {% for staff in staff_list %}
-                            {% if staff.id != user.staffprofile.id %}
+            {% if is_supervisor %}
+                <div class="card border-0">
+                    <div class="card-body p-2">
+                        <select id="viewSelector" class="form-select">
+                            <option value="">Mis Citas</option>
+                            <option value="global">Todas las Citas</option>
+                            {% for staff in staff_list %}
                                 <option value="{{ staff.id }}">Citas de {{ staff.user.get_full_name }}</option>
-                            {% endif %}
-                        {% endfor %}
-                    </select>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
-            </div>
+                {% endif %}
             {% endif %}
             <button type="button" class="btn btn-outline-primary d-flex align-items-center gap-2" id="refreshDashboard">
                 <i class="fas fa-sync-alt"></i>
@@ -566,11 +566,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="d-flex flex-column">
                                 <div class="fw-bold text-truncate">${props.visitor_name}</div>
                                 <div class="event-stage-badge">${props.stage}</div>
-                                ${!isMonthView ? `
-                                    <div class="small text-muted mt-1">
-                                        ${props.staff_name}
-                                    </div>
-                                ` : ''}
+                                <div class="small text-muted mt-1 ${isMonthView ? 'text-truncate' : ''}">
+                                    ${props.staff_name}
+                                </div>
                                 <div class="small">
                                     <span class="badge bg-${getStatusClass(props.status)}">
                                         ${getStatusText(props.status)}
