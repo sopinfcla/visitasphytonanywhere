@@ -7,7 +7,8 @@ from .views import (
     StaffLoginView,
     DashboardView,
     DashboardStatsView,
-    DashboardCalendarView
+    DashboardCalendarView,
+    AppointmentExportView  # Añadimos el nuevo import
 )
 
 urlpatterns = [
@@ -43,6 +44,10 @@ urlpatterns = [
     # API Appointments
     path('api/appointments/', views.AppointmentAPIView.as_view(), name='api_appointments'),
     path('api/appointments/<int:appointment_id>/', views.AppointmentAPIView.as_view(), name='api_appointment_detail'),
+    
+    # Nuevos endpoints para exportación
+    path('api/appointments/export/', AppointmentExportView.as_view(), name='appointment_export'),
+    path('api/appointments/<int:appointment_id>/export/', AppointmentExportView.as_view(), name='appointment_single_export'),
 
     # Staff Profile Management
     path('staff/profile/', StaffProfileView.as_view(), name='staff_profile'),

@@ -68,7 +68,9 @@ function initializeDataTable() {
         responsive: true,
         searching: true,
         search: {
-            smart: true
+            smart: true,
+            regex: true,
+            caseInsensitive: true
         },
         ajax: {
             url: window.APPOINTMENTS_CONFIG.apiUrl,
@@ -99,7 +101,6 @@ function initializeDataTable() {
                 if (date) filters.date = date;
                 if (status) filters.status = status;
                 
-                console.log('DataTable filter params:', filters);
                 return filters;
             }
         },
@@ -107,20 +108,25 @@ function initializeDataTable() {
             { 
                 data: 'date',
                 orderable: true,
+                searchable: true,
                 render: function (data) {
-                    return data ? moment(data).format('DD/MM/YYYY') : '';
+                    const formattedDate = moment(data).format('DD/MM/YYYY');
+                    return `<span data-search="${formattedDate}">${formattedDate}</span>`;
                 }
             },
             { 
                 data: 'date',
                 orderable: true,
+                searchable: true,
                 render: function (data) {
-                    return data ? moment(data).format('HH:mm') : '';
+                    const formattedTime = moment(data).format('HH:mm');
+                    return `<span data-search="${formattedTime}">${formattedTime}</span>`;
                 }
             },
             { 
                 data: 'visitor_name',
                 orderable: true,
+                searchable: true,
                 render: function (data, type, row) {
                     return `
                         <div>
@@ -130,23 +136,32 @@ function initializeDataTable() {
                     `;
                 }
             },
-            { data: 'stage_name', orderable: true },
+            { 
+                data: 'stage_name', 
+                orderable: true,
+                searchable: true
+            },
             { 
                 data: 'status',
                 orderable: true,
+                searchable: true,
                 render: function (data) {
                     const status = ESTADO_LABELS[data] || { class: 'bg-secondary', text: data || 'N/A' };
-                    return `<span class="badge ${status.class}">${status.text}</span>`;
+                    return `<span class="badge ${status.class}" data-search="${status.text}">${status.text}</span>`;
                 }
             },
             { 
                 data: 'id',
                 orderable: false,
+                searchable: false,
                 render: function (data) {
                     return `
                         <div class="btn-group btn-group-sm">
                             <button class="btn btn-outline-primary edit-appointment" data-id="${data}">
                                 <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-outline-info download-pdf" data-id="${data}" title="Descargar PDF">
+                                <i class="bi bi-file-pdf"></i>
                             </button>
                             <button class="btn btn-outline-danger delete-appointment" data-id="${data}">
                                 <i class="bi bi-trash"></i>
@@ -181,22 +196,13 @@ function initializeDataTable() {
         order: [[0, 'desc'], [1, 'desc']]
     });
 
+    // Mejorar búsqueda para incluir fecha y estado
     $('.dataTables_filter input').off().on('input', function() {
-        console.log('Search input changed:', this.value);
-        appointmentsTable.search(this.value).draw();
-    });
-
-    let processingTimeout;
-    appointmentsTable.on('processing.dt', function(e, settings, processing) {
-        clearTimeout(processingTimeout);
-        
-        if (processing) {
-            processingTimeout = setTimeout(() => {
-                $('.dataTables_processing').removeClass('hidden');
-            }, 300);
-        } else {
-            $('.dataTables_processing').addClass('hidden');
-        }
+        const searchValue = this.value;
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            appointmentsTable.search(searchValue).draw();
+        }, 500);
     });
 }
 
@@ -206,6 +212,7 @@ function initializeDataTable() {
 function initializeEventListeners() {
     console.log('Initializing event listeners...');
 
+    // Filtros
     $('#stage-filter, #date-filter, #status-filter').on('change', function() {
         console.log(`Filter changed: ${this.id} = ${this.value}`);
         appointmentsTable.ajax.reload();
@@ -218,6 +225,26 @@ function initializeEventListeners() {
         appointmentsTable.ajax.reload();
     });
 
+    // Botones de exportación
+    $('#exportPDF').on('click', function() {
+        const currentUrl = new URL(window.location.href);
+        const exportUrl = `${window.APPOINTMENTS_CONFIG.apiUrl}export/?${currentUrl.searchParams.toString()}&type=pdf`;
+        window.location.href = exportUrl;
+    });
+    
+    $('#exportExcel').on('click', function() {
+        const currentUrl = new URL(window.location.href);
+        const exportUrl = `${window.APPOINTMENTS_CONFIG.apiUrl}export/?${currentUrl.searchParams.toString()}&type=excel`;
+        window.location.href = exportUrl;
+    });
+    
+    // PDF individual
+    $(document).on('click', '.download-pdf', function() {
+        const id = $(this).data('id');
+        window.location.href = `${window.APPOINTMENTS_CONFIG.apiUrl}${id}/export/?type=pdf`;
+    });
+
+    // CRUD Operations
     $(document).on('click', '.edit-appointment', function() {
         const id = $(this).data('id');
         console.log('Edit appointment clicked:', id);
@@ -241,13 +268,9 @@ function initializeEventListeners() {
         e.preventDefault();
     });
     
-    $('#appointmentModal').on('hidden.bs.modal', function (e) {
+    $('#appointmentModal').on('hidden.bs.modal', function () {
         console.log('Modal hidden event triggered');
         cleanupModal();
-    });
-
-    $('#appointmentModal').on('shown.bs.modal', function () {
-        console.log('Modal shown event triggered');
     });
 }
 
@@ -344,38 +367,23 @@ function saveAppointment() {
     if (dateValue && timeValue) {
         formData.date = `${dateValue}T${timeValue}`;
     }
-    console.log('Date value:', formData.date);
     
-    // Capturar todos los campos incluyendo notas y fecha de seguimiento
     ['visitor_name', 'visitor_email', 'visitor_phone', 'stage', 'status', 
      'duration', 'comments', 'notes', 'follow_up_date'].forEach(field => {
         const value = $(`#${field}`).val();
         if (value !== undefined && value !== null && value !== '') {
             formData[field] = (field === 'duration') ? parseInt(value) : value;
         }
-        console.log(`Field ${field}:`, value);
     });
 
-    // Validación de duración
-    const allowedDurations = [30, 45, 60];
-    if (isNaN(formData.duration) || !allowedDurations.includes(formData.duration)) {
-        console.log('Invalid duration:', formData.duration);
-        showToast('Por favor, seleccione una duración válida (30, 45 o 60 minutos)', 'error');
-        return;
-    }
-
-    // Validación de campos requeridos
     if (!formData.date || !formData.visitor_name || !formData.visitor_email || 
         !formData.visitor_phone || !formData.stage || !formData.duration) {
-        console.log('Missing required fields:', formData);
         showToast('Por favor, complete todos los campos requeridos', 'error');
         return;
     }
 
     const saveBtn = $('#saveAppointment');
     const modal = $('#appointmentModal');
-    
-    console.log('Sending data to server:', formData);
     
     $.ajax({
         url: id ? `${window.APPOINTMENTS_CONFIG.apiUrl}${id}/` : window.APPOINTMENTS_CONFIG.apiUrl,
@@ -386,22 +394,19 @@ function saveAppointment() {
             'X-CSRFToken': window.APPOINTMENTS_CONFIG.csrfToken
         },
         beforeSend: function() {
-            console.log('Disabling save button');
             saveBtn.prop('disabled', true);
         },
         success: function(response) {
-            console.log('Server response:', response);
             appointmentsTable.ajax.reload();
             showToast('Cita guardada correctamente');
-            console.log('Attempting to close modal...');
             modal.modal('hide');
             cleanupModal();
-            saveBtn.prop('disabled', false);  
         },
         error: function(xhr) {
-            console.error('Server error:', xhr);
             const errorMessage = xhr.responseJSON?.error || 'Error al guardar la cita';
             showToast(errorMessage, 'error');
+        },
+        complete: function() {
             saveBtn.prop('disabled', false);
         }
     });

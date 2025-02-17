@@ -1131,3 +1131,250 @@ class DashboardStatsView(LoginRequiredMixin, View):
         except Exception as e:
             logger.error(f"Error obteniendo estadísticas: {str(e)}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)
+        
+# ====================================
+# Part 8: Export Functions
+# ====================================
+
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import HttpResponse, JsonResponse
+from django.views import View
+from django.utils import timezone
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+import io
+import xlsxwriter
+import logging
+
+logger = logging.getLogger(__name__)
+
+class AppointmentExportView(LoginRequiredMixin, View):
+    def get_appointment_data(self, appointment_id=None):
+        """Obtiene los datos formateados de las citas"""
+        if appointment_id:
+            appointments = Appointment.objects.filter(id=appointment_id)
+        else:
+            appointments = Appointment.objects.filter(staff=self.request.user.staffprofile)
+        
+        # Aplicar filtros si existen
+        stage = self.request.GET.get('stage')
+        date = self.request.GET.get('date')
+        status = self.request.GET.get('status')
+        
+        if stage:
+            appointments = appointments.filter(stage_id=stage)
+        if date:
+            appointments = appointments.filter(date__date=date)
+        if status:
+            appointments = appointments.filter(status=status)
+            
+        return appointments
+
+    def generate_pdf(self, appointment_id=None):
+        """Genera un PDF con los datos de la(s) cita(s)"""
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer, 
+            pagesize=letter,
+            rightMargin=30,
+            leftMargin=30,
+            topMargin=30,
+            bottomMargin=30
+        )
+        story = []
+        styles = getSampleStyleSheet()
+        
+        # Estilo personalizado para el título
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            spaceAfter=30,
+            alignment=1  # Centrado
+        )
+        
+        # Añadir título
+        title = "Informe de Cita" if appointment_id else "Informe de Citas"
+        story.append(Paragraph(title, title_style))
+        
+        # Añadir fecha de generación
+        date_style = ParagraphStyle(
+            'DateStyle',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.gray,
+            alignment=1  # Centrado
+        )
+        story.append(Paragraph(f"Generado el {timezone.now().strftime('%d/%m/%Y %H:%M')}", date_style))
+        story.append(Spacer(1, 20))
+
+        appointments = self.get_appointment_data(appointment_id)
+        
+        if appointment_id:
+            # Para una sola cita, mostrar todos los detalles
+            appointment = appointments.first()
+            data = [
+                ["Información de la Cita", ""],
+                ["Visitante:", appointment.visitor_name],
+                ["Email:", appointment.visitor_email],
+                ["Teléfono:", appointment.visitor_phone],
+                ["Etapa:", appointment.stage.name],
+                ["Fecha:", appointment.date.strftime("%d/%m/%Y")],
+                ["Hora:", appointment.date.strftime("%H:%M")],
+                ["Estado:", dict(Appointment.STATUS_CHOICES)[appointment.status]],
+                ["Duración:", f"{appointment.duration} minutos"],
+                ["Comentarios:", appointment.comments or ""],
+                ["Notas:", appointment.notes or ""]
+            ]
+            
+            # Estilo de tabla detallada
+            table_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f2f2f2')),
+                ('SPAN', (0, 0), (1, 0)),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTNAME', (1, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, 0), 14),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ])
+        else:
+            # Para múltiples citas, formato de lista
+            data = [["Fecha", "Hora", "Visitante", "Etapa", "Estado"]]
+            for apt in appointments:
+                data.append([
+                    apt.date.strftime("%d/%m/%Y"),
+                    apt.date.strftime("%H:%M"),
+                    apt.visitor_name,
+                    apt.stage.name,
+                    dict(Appointment.STATUS_CHOICES)[apt.status]
+                ])
+            
+            # Estilo de tabla lista
+            table_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f2f2f2')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ])
+
+        # Calcular anchos de columna según el tipo de tabla
+        if appointment_id:
+            col_widths = [2.5*inch, 4*inch]
+        else:
+            col_widths = [1.2*inch, 1*inch, 2*inch, 1.8*inch, 1.5*inch]
+        
+        table = Table(data, colWidths=col_widths, repeatRows=1)
+        table.setStyle(table_style)
+        
+        story.append(table)
+        
+        # Agregar pie de página
+        footer_style = ParagraphStyle(
+            'Footer',
+            parent=styles['Normal'],
+            fontSize=8,
+            textColor=colors.gray,
+            alignment=1
+        )
+        story.append(Spacer(1, 20))
+        story.append(Paragraph("Documento generado automáticamente por el sistema de gestión de citas", footer_style))
+        
+        doc.build(story)
+        pdf = buffer.getvalue()
+        buffer.close()
+        return pdf
+
+    def generate_excel(self):
+        """Genera un archivo Excel con los datos filtrados"""
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet()
+
+        # Estilos
+        header_format = workbook.add_format({
+            'bold': True,
+            'bg_color': '#4B5563',
+            'color': 'white',
+            'align': 'center',
+            'valign': 'vcenter',
+            'border': 1
+        })
+        
+        cell_format = workbook.add_format({
+            'align': 'left',
+            'valign': 'vcenter',
+            'border': 1
+        })
+        
+        # Encabezados
+        headers = ['Fecha', 'Hora', 'Visitante', 'Email', 'Teléfono', 'Etapa', 'Estado', 'Duración', 'Comentarios']
+        for col, header in enumerate(headers):
+            worksheet.write(0, col, header, header_format)
+            worksheet.set_column(col, col, 15)  # Ancho de columna
+        
+        # Datos
+        appointments = self.get_appointment_data()
+        for row, apt in enumerate(appointments, start=1):
+            data = [
+                apt.date.strftime("%d/%m/%Y"),
+                apt.date.strftime("%H:%M"),
+                apt.visitor_name,
+                apt.visitor_email,
+                apt.visitor_phone,
+                apt.stage.name,
+                dict(Appointment.STATUS_CHOICES)[apt.status],
+                f"{apt.duration} min",
+                apt.comments or ""
+            ]
+            for col, value in enumerate(data):
+                worksheet.write(row, col, value, cell_format)
+        
+        workbook.close()
+        excel_data = output.getvalue()
+        output.close()
+        return excel_data
+
+    def get(self, request, format=None, appointment_id=None):
+        try:
+            export_type = request.GET.get('type', 'pdf')
+            
+            if export_type == 'pdf':
+                response = HttpResponse(content_type='application/pdf')
+                filename = f"cita_{appointment_id}.pdf" if appointment_id else "citas.pdf"
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                response.write(self.generate_pdf(appointment_id))
+            else:  # excel
+                response = HttpResponse(
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                )
+                response['Content-Disposition'] = 'attachment; filename="citas.xlsx"'
+                response.write(self.generate_excel())
+            
+            return response
+        except Exception as e:
+            logger.error(f"Error generando exportación: {str(e)}", exc_info=True)
+            return JsonResponse({'error': str(e)}, status=500)
