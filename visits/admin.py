@@ -21,8 +21,8 @@ class SchoolStageAdmin(admin.ModelAdmin):
 # ====================================
 @admin.register(StaffProfile)
 class StaffProfileAdmin(admin.ModelAdmin):
-    list_display = ['user', 'get_full_name', 'get_stages', 'active_slots_count', 'get_is_staff']
-    list_filter = ['allowed_stages', 'user__is_staff']  # ✅ Usamos user__is_staff
+    list_display = ['user', 'get_full_name', 'get_stages', 'active_slots_count', 'get_notifications_status', 'get_is_staff']
+    list_filter = ['allowed_stages', 'user__is_staff', 'notify_new_appointment', 'notify_reminder']
     search_fields = ['user__first_name', 'user__last_name', 'user__email']
     filter_horizontal = ['allowed_stages']
 
@@ -39,21 +39,28 @@ class StaffProfileAdmin(admin.ModelAdmin):
     active_slots_count.short_description = 'Slots activos'
 
     def get_is_staff(self, obj):
-        return obj.user.is_staff  # ✅ Tomamos is_staff desde User
+        return obj.user.is_staff
     get_is_staff.boolean = True
     get_is_staff.short_description = "Es Staff"
+
+    def get_notifications_status(self, obj):
+        icons = []
+        if obj.notify_new_appointment:
+            icons.append('✉️')
+        if obj.notify_reminder:
+            icons.append('⏰')
+        return ' '.join(icons) if icons else '❌'
+    get_notifications_status.short_description = 'Notificaciones'
 
     def get_fieldsets(self, request, obj=None):
         fieldsets = [
             (None, {
                 'fields': ('user', 'allowed_stages')
             }),
-            ('Permisos', {
-                'fields': ('user__is_staff',),  # ✅ is_staff pertenece a User
-            }),
             ('Notificaciones', {
                 'fields': ('notify_new_appointment', 'notify_reminder'),
-                'classes': ('collapse',)
+                'classes': ('collapse',),
+                'description': 'Configuración de notificaciones por email: "Nuevas citas" envía un email cuando se agenda una cita nueva. "Recordatorios" envía un email 24h antes de cada cita.'
             }),
         ]
         return fieldsets
@@ -69,11 +76,28 @@ class StaffProfileAdmin(admin.ModelAdmin):
 # ====================================
 @admin.register(Appointment)
 class AppointmentAdmin(admin.ModelAdmin):
-    list_display = ['visitor_name', 'stage', 'staff', 'formatted_date', 'visitor_email', 'visitor_phone']
-    list_filter = ['stage', 'staff', 'date']
+    list_display = ['visitor_name', 'stage', 'staff', 'formatted_date', 'status', 'visitor_email', 'visitor_phone']
+    list_filter = ['stage', 'staff', 'date', 'status']
     search_fields = ['visitor_name', 'visitor_email', 'visitor_phone']
     date_hierarchy = 'date'
     readonly_fields = ['created_at']
+
+    fieldsets = (
+        ('Información del visitante', {
+            'fields': ('visitor_name', 'visitor_email', 'visitor_phone')
+        }),
+        ('Detalles de la cita', {
+            'fields': ('stage', 'staff', 'date', 'duration', 'status')
+        }),
+        ('Notas y seguimiento', {
+            'fields': ('comments', 'notes', 'follow_up_date'),
+            'classes': ('collapse',)
+        }),
+        ('Información del sistema', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
 
     def formatted_date(self, obj):
         local_dt = timezone.localtime(obj.date)
@@ -134,7 +158,6 @@ class AvailabilitySlotAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         if not obj or request.user.is_superuser:
             return True
-        # ✅ Corregido para usar user.is_staff en lugar de staffprofile.is_staff
         if hasattr(request.user, 'staffprofile') and request.user.is_staff:
             return True
         return obj.staff.user == request.user
@@ -142,7 +165,6 @@ class AvailabilitySlotAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         if not obj or request.user.is_superuser:
             return True
-        # ✅ Corregido para usar user.is_staff en lugar de staffprofile.is_staff
         if hasattr(request.user, 'staffprofile') and request.user.is_staff:
             return True
         return obj.staff.user == request.user

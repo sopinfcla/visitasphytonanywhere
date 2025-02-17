@@ -5,12 +5,12 @@ from datetime import datetime, timedelta
 
 class AppointmentSerializer(serializers.ModelSerializer):
     """Serializer for Appointment model with calendar and CRUD functionality"""
-    title = serializers.SerializerMethodField()
-    start = serializers.SerializerMethodField()
-    end = serializers.SerializerMethodField()
+    title = serializers.SerializerMethodField(read_only=True)
+    start = serializers.SerializerMethodField(read_only=True)
+    end = serializers.SerializerMethodField(read_only=True)
     
     stage_name = serializers.CharField(source='stage.name', read_only=True)
-    fecha_y_hora = serializers.SerializerMethodField()
+    fecha_y_hora = serializers.SerializerMethodField(read_only=True)
     status = serializers.CharField(required=False, default='pending')
 
     class Meta:
@@ -19,8 +19,17 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'id', 'visitor_name', 'visitor_email', 'visitor_phone',
             'stage', 'stage_name', 'status', 'comments', 'staff', 'date',
             'duration', 'title', 'start', 'end', 'fecha_y_hora',
-            'notes', 'follow_up_date'  # Nuevos campos añadidos
+            'notes', 'follow_up_date'
         ]
+        extra_kwargs = {
+            'staff': {'required': True},
+            'visitor_name': {'required': True},
+            'visitor_email': {'required': True},
+            'visitor_phone': {'required': True},
+            'stage': {'required': True},
+            'date': {'required': True},
+            'duration': {'required': True}
+        }
 
     def get_title(self, obj):
         return f"{obj.visitor_name} - {obj.stage.name}"
@@ -33,6 +42,24 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
     def get_fecha_y_hora(self, obj):
         return obj.date.strftime('%d/%m/%Y %H:%M')
+
+    def validate(self, data):
+        """Validación personalizada para los datos de la cita"""
+        # Validar teléfono
+        if 'visitor_phone' in data:
+            phone = data['visitor_phone']
+            if not phone.isdigit() or len(phone) != 9:
+                raise serializers.ValidationError({
+                    'visitor_phone': 'El teléfono debe contener exactamente 9 dígitos.'
+                })
+
+        # Validar duración
+        if 'duration' in data and data['duration'] not in [15, 30, 45, 60]:
+            raise serializers.ValidationError({
+                'duration': 'La duración debe ser 15, 30, 45 o 60 minutos.'
+            })
+
+        return data
 
 
 class AvailabilitySlotSerializer(serializers.ModelSerializer):
@@ -63,6 +90,7 @@ class AvailabilitySlotSerializer(serializers.ModelSerializer):
         hora = obj.start_time.strftime('%H:%M')
         return f"{fecha} {hora}"
 
+
 class CalendarDaySerializer(serializers.Serializer):
     date = serializers.DateField()
     available = serializers.BooleanField(default=True)
@@ -72,6 +100,7 @@ class CalendarDaySerializer(serializers.Serializer):
         if isinstance(instance['date'], datetime.date):
             data['date'] = instance['date'].isoformat()
         return data
+
 
 class SlotDetailSerializer(serializers.ModelSerializer):
     staff_name = serializers.SerializerMethodField()

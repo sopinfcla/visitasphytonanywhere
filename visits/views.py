@@ -17,6 +17,7 @@ from django.db.models import Q
 from django.db.models.functions import ExtractHour
 from django.utils.timezone import is_naive, make_aware, localtime
 from django.middleware.csrf import get_token
+from django.db import transaction
 
 
 # Importaciones de Python
@@ -263,48 +264,66 @@ def get_stage_availability(request, stage_id):
 def book_appointment(request, stage_id, slot_id):
     stage = get_object_or_404(SchoolStage, id=stage_id)
     slot = get_object_or_404(AvailabilitySlot, id=slot_id, stage_id=stage_id, is_active=True)
+    
     if request.method == 'POST':
         try:
-            phone = request.POST.get('visitor_phone', '').strip()
-            if not phone.isdigit() or len(phone) != 9:
-                return JsonResponse({'error': 'El número de teléfono debe contener exactamente 9 dígitos'}, status=400)
-            
-            appointment_datetime = datetime.combine(slot.date, slot.start_time)
-            appointment_datetime = make_aware(appointment_datetime, get_current_timezone())
-            
-            if not is_slot_available(slot.staff, appointment_datetime, slot.duration):
+            with transaction.atomic():  # Inicio de transacción atómica
+                phone = request.POST.get('visitor_phone', '').strip()
+                if not phone.isdigit() or len(phone) != 9:
+                    return JsonResponse({
+                        'error': 'El número de teléfono debe contener exactamente 9 dígitos'
+                    }, status=400)
+                
+                appointment_datetime = datetime.combine(slot.date, slot.start_time)
+                appointment_datetime = make_aware(appointment_datetime, get_current_timezone())
+                
+                # Verificar disponibilidad con bloqueo
+                if Appointment.objects.select_for_update().filter(
+                    staff=slot.staff,
+                    date__lt=appointment_datetime + timedelta(minutes=slot.duration),
+                    date__gt=appointment_datetime - timedelta(minutes=slot.duration)
+                ).exists():
+                    return JsonResponse({
+                        'error': 'Horario no disponible',
+                        'redirect_url': reverse('stage_booking', kwargs={'stage_id': stage_id})
+                    }, status=400)
+                
+                # Crear la cita
+                appointment = Appointment.objects.create(
+                    stage=stage,
+                    staff=slot.staff,
+                    visitor_name=request.POST.get('visitor_name'),
+                    visitor_email=request.POST.get('visitor_email'),
+                    visitor_phone=phone,
+                    date=appointment_datetime,
+                    duration=slot.duration,
+                    comments=request.POST.get('comments', '')
+                )
+
+                # Enviar email de confirmación
+                try:
+                    send_appointment_confirmation(appointment)
+                except Exception as e:
+                    logger.error(f"Error enviando email de confirmación: {str(e)}", exc_info=True)
+                    # No revertimos la creación de la cita si falla el email
+                
+                # Eliminar slots solapados
+                appointment_end = appointment_datetime + timedelta(minutes=slot.duration)
+                AvailabilitySlot.objects.filter(
+                    staff=slot.staff,
+                    date=slot.date
+                ).filter(
+                    start_time__lt=appointment_end.time(),
+                    end_time__gt=appointment_datetime.time()
+                ).delete()
+                
                 return JsonResponse({
-                    'error': 'Horario no disponible',
-                    'redirect_url': reverse('stage_booking', kwargs={'stage_id': stage_id})
-                }, status=400)
-            
-            # Aseguramos capturar la duración del slot y los comentarios
-            appointment = Appointment.objects.create(
-                stage=stage,
-                staff=slot.staff,
-                visitor_name=request.POST.get('visitor_name'),
-                visitor_email=request.POST.get('visitor_email'),
-                visitor_phone=phone,
-                date=appointment_datetime,
-                duration=slot.duration,  # Usamos la duración del slot
-                comments=request.POST.get('comments', '')  # Guardamos los comentarios
-            )
-            
-            appointment_end = appointment_datetime + timedelta(minutes=slot.duration)
-            # Eliminar slots solapados
-            AvailabilitySlot.objects.filter(
-                staff=slot.staff,
-                date=slot.date
-            ).filter(
-                start_time__lt=appointment_end.time(),
-                end_time__gt=appointment_datetime.time()
-            ).delete()
-            
-            return JsonResponse({
-                'status': 'success',
-                'appointment_id': appointment.id,
-                'redirect_url': reverse('appointment_confirmation', kwargs={'appointment_id': appointment.id})
-            })
+                    'status': 'success',
+                    'appointment_id': appointment.id,
+                    'redirect_url': reverse('appointment_confirmation', 
+                                         kwargs={'appointment_id': appointment.id})
+                })
+                
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
             
@@ -314,7 +333,6 @@ def book_appointment(request, stage_id, slot_id):
         'staff_name': slot.staff.user.get_full_name()
     }
     return render(request, 'visits/book_appointment.html', context)
-
 # ====================================
 # Part 5: Staff Availability
 # ====================================
@@ -676,13 +694,19 @@ class AppointmentAPIView(LoginRequiredMixin, View):
 
     def post(self, request):
         try:
+            # 1. Preparar los datos
             data = json.loads(request.body)
             logger.debug(f"Received POST data: {data}")
 
+            # 2. Asignar staff_id (antes de la validación)
             is_supervisor = request.user.groups.filter(name='Supervisor').exists()
             if not is_supervisor:
                 data['staff'] = request.user.staffprofile.id
-            
+            else:
+                if 'staff' not in data:
+                    data['staff'] = request.user.staffprofile.id
+
+            # 3. Validar y procesar fecha
             try:
                 date_str = data.get('date', '')
                 appointment_date = make_aware(datetime.fromisoformat(date_str))
@@ -691,17 +715,12 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                 logger.error(f"Error parsing date: {str(e)}")
                 return JsonResponse({'error': 'Formato de fecha inválido'}, status=400)
 
-            # Validación de duración
-            duration = data.get('duration')
-            if not duration or not isinstance(duration, int) or duration not in [15, 30, 45, 60]:
-                return JsonResponse({'error': 'Duración inválida'}, status=400)
-
-            # Verificar solapamientos
-            staff_id = data.get('staff', request.user.staffprofile.id)
+            # 4. Verificar solapamientos
+            staff_id = data['staff']  # Ahora podemos usar data['staff'] con seguridad
             overlap = Appointment.objects.filter(
                 staff_id=staff_id,
-                date__lt=appointment_date + timedelta(minutes=duration),
-                date__gt=appointment_date - timedelta(minutes=duration)
+                date__lt=appointment_date + timedelta(minutes=data.get('duration', 60)),
+                date__gt=appointment_date - timedelta(minutes=data.get('duration', 60))
             ).exists()
 
             if overlap:
@@ -709,12 +728,13 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                     'error': 'Ya existe una cita en este horario'
                 }, status=400)
 
+            # 5. Crear la cita
             serializer = AppointmentSerializer(data=data)
             if serializer.is_valid():
                 appointment = serializer.save()
                 logger.info(f"Created appointment: {appointment.id}")
                 
-                # Eliminar slots solapados
+                # 6. Eliminar slots solapados
                 appointment_end = appointment.date + timedelta(minutes=appointment.duration)
                 AvailabilitySlot.objects.filter(
                     staff_id=staff_id,
