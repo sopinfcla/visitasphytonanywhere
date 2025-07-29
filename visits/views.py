@@ -107,42 +107,64 @@ class PublicBookingView(TemplateView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        stages = []
-        for stage in SchoolStage.objects.all().prefetch_related('staffprofile_set'):
-            stage_data = {
-                'id': stage.id,
-                'name': stage.name,
-                'description': stage.description,
-                'staff': [{'id': s.id, 'name': s.user.get_full_name()} for s in stage.staffprofile_set.all()]
-            }
-            metadata = {
-                'Escuela Infantil': {
-                    'icon': '👶',
-                    'features': ['Programa bilingüe', 'Nuevas tecnologías', 'Desarrollo personal']
-                },
-                'Infantil': {
-                    'icon': '🎨',
-                    'features': ['Aprendizaje lúdico', 'Desarrollo creativo', 'Socialización']
-                },
-                'Primaria': {
-                    'icon': '📚',
-                    'features': ['Ciencias', 'Humanidades', 'Orientación académica']
-                },
-                'Secundaria': {
-                    'icon': '🔬',
-                    'features': ['Orientación académica', 'Innovación educativa', 'Formación integral']
-                },
-                'Bachillerato': {
-                    'icon': '🎓',
-                    'features': ['Ciencias', 'Humanidades', 'Orientación universitaria']
-                }
-            }
-            if stage.name in metadata:
-                stage_data.update(metadata[stage.name])
-            stages.append(stage_data)
         
-        context['stages'] = stages
-        context['stages_json'] = json.dumps(stages)
+        # Diccionario con los metadatos, incluyendo la descripción correcta.
+        stages_metadata = {
+            'Escuela Infantil': {
+                'icon': '<i class="fas fa-baby-carriage"></i>',
+                'age_range': '(0-3 años)',
+                'description': 'Los primeros pasos en un mundo de aprendizaje, cariño y descubrimiento.'
+            },
+            'Infantil': {
+                'icon': '<i class="fas fa-cubes"></i>',
+                'age_range': '(3-6 años)',
+                'description': 'Una etapa para crecer, jugar y explorar la creatividad en un entorno seguro y estimulante.'
+            },
+            'Primaria': {
+                'icon': '<i class="fas fa-book-open-reader"></i>',
+                'age_range': '(6-12 años)',
+                'description': 'Fomentamos la curiosidad y sentamos las bases del conocimiento, los valores y la amistad.'
+            },
+            'Secundaria': {
+                'icon': '<i class="fas fa-atom"></i>',
+                'age_range': '(12-16 años)',
+                'description': 'Acompañamos a los alumnos en su desarrollo académico y personal hacia la madurez.'
+            },
+            'Bachillerato': {
+                'icon': '<i class="fas fa-user-graduate"></i>',
+                'age_range': '(16-18 años)',
+                'description': 'Preparamos a los estudiantes para la universidad y su futuro profesional con una base sólida.'
+            },
+            'Ciclos Formativos': {
+                'icon': '<i class="fas fa-cogs"></i>',
+                'age_range': '(Mayores de 16 años)',
+                'description': 'Formación práctica y especializada para una rápida y exitosa inserción en el mundo laboral.'
+            }
+        }
+
+        stages_list = []
+        # Obtenemos todas las etapas de la base de datos
+        all_stages_from_db = SchoolStage.objects.all()
+
+        # Usamos enumerate para obtener un índice para la animación
+        for i, stage_obj in enumerate(all_stages_from_db):
+            # Empezamos con los datos del modelo
+            stage_data = {
+                'id': stage_obj.id,
+                'name': stage_obj.name,
+                'description': stage_obj.description, # Descripción por defecto de la BD
+                'animation_delay': i * 100,
+            }
+            
+            # Buscamos los metadatos para esta etapa
+            metadata = stages_metadata.get(stage_obj.name, {})
+            
+            # Actualizamos los datos. La descripción de metadata sobreescribirá la de la BD.
+            stage_data.update(metadata)
+            
+            stages_list.append(stage_data)
+        
+        context['stages'] = stages_list
         return context
 
 class StageBookingView(TemplateView):

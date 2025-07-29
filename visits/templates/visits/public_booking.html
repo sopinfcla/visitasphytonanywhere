@@ -1,59 +1,36 @@
 {% extends "base.html" %}
 {% load static %}
 
+{% block title %}Reserva tu Visita - {{ block.super }}{% endblock %}
+
 {% block content %}
-<!-- Header de Sección -->
-<section class="bg-primary text-white py-5">
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-lg-8 text-center">
-                <h2 class="display-5 fw-bold mb-3">Conoce Nuestro Cole</h2>
-                <p class="lead mb-0">Reserva una visita personalizada para conocer nuestras instalaciones y proyecto educativo</p>
-            </div>
-        </div>
+<section class="hero-section">
+    <div class="container text-center text-white">
+        <h1 class="display-4 fw-bold mb-3">Descubre tu futuro colegio</h1>
+        <p class="lead col-lg-8 mx-auto">Te abrimos las puertas del Claret. Elige la etapa educativa que te interesa y reserva una visita personalizada. ¡Estamos deseando conocerte!</p>
     </div>
+    <div class="hero-background-shape"></div>
 </section>
 
-<!-- Breadcrumb -->
-<nav class="bg-light border-bottom py-2">
-    <div class="container">
-        <ol class="breadcrumb mb-0">
-            <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Inicio</a></li>
-            <li class="breadcrumb-item active">Reservar Visita</li>
-        </ol>
-    </div>
-</nav>
-
-<!-- Grid de Etapas -->
-<div class="container py-5">
-    <div class="row g-4">
+<div class="container py-5 mt-n5" style="position: relative; z-index: 2;">
+    <div class="row g-4 justify-content-center">
         {% for stage in stages %}
-        <div class="col-md-6 col-lg-4">
-            <div class="card h-100 hover-shadow">
-                <div class="card-body p-4">
-                    <div class="stage-icon mb-3 text-center">
-                        <span class="display-4">{{ stage.icon|safe }}</span>
+        <div class="col-md-6 col-lg-4 d-flex align-items-stretch animated-card" style="transition-delay: {{ stage.animation_delay }}ms;">
+            <div class="stage-card">
+                <div class="card-body p-4 d-flex flex-column">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="stage-icon-wrapper">{{ stage.icon|safe }}</div>
+                        <div class="ms-3">
+                            <h3 class="stage-title h5 mb-0">{{ stage.name }}</h3>
+                            {% if stage.age_range %}
+                            <p class="stage-age text-muted mb-0">{{ stage.age_range }}</p>
+                            {% endif %}
+                        </div>
                     </div>
-                    
-                    <h3 class="h4 mb-3 text-center">{{ stage.name }}</h3>
-                    <p class="text-muted mb-3">{{ stage.description }}</p>
-                    
-                    {% if stage.features %}
-                    <ul class="list-unstyled mb-4">
-                        {% for feature in stage.features %}
-                        <li class="mb-2">
-                            <i class="fas fa-check-circle text-success me-2"></i>
-                            {{ feature }}
-                        </li>
-                        {% endfor %}
-                    </ul>
-                    {% endif %}
-                    
-                    <div class="text-center mt-auto">
-                        <a href="{% url 'stage_booking' stage.id %}" class="btn btn-primary w-100">
-                            Reservar Visita
-                        </a>
-                    </div>
+                    <p class="text-muted mb-4 flex-grow-1">{{ stage.description }}</p>
+                    <a href="{% url 'stage_booking' stage.id %}" class="btn btn-primary w-100 btn-book-visit mt-auto">
+                        Reservar Visita <i class="fas fa-arrow-right ms-2"></i>
+                    </a>
                 </div>
             </div>
         </div>
@@ -64,18 +41,151 @@
 
 {% block extra_css %}
 <style>
-    .stage-icon {
+    /* Hero Section con gradiente equilibrado */
+    .hero-section {
+        background: linear-gradient(45deg, var(--claret-purple), #8E5A9C);
+        padding: 6rem 0;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .hero-section .container {
+        position: relative;
+        z-index: 2;
+    }
+
+    .hero-section::before,
+    .hero-section::after {
+        content: '';
+        position: absolute;
+        background-color: rgba(255, 255, 255, 0.07);
+        border-radius: 50%;
+        z-index: 0;
+    }
+
+    .hero-section::before {
+        width: 250px;
+        height: 250px;
+        top: -80px;
+        left: -80px;
+    }
+
+    .hero-section::after {
+        width: 400px;
+        height: 400px;
+        bottom: -150px;
+        right: -100px;
+    }
+
+    .hero-background-shape {
+        position: absolute;
+        bottom: -1px;
+        left: 0;
+        width: 100%;
+        height: 150px;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%23f4f7fc' fill-opacity='1' d='M0,192L80,176C160,160,320,128,480,133.3C640,139,800,181,960,186.7C1120,192,1280,160,1360,144L1440,128L1440,320L1360,320C1280,320,1120,320,960,320C800,320,640,320,480,320C320,320,160,320,80,320L0,320Z'%3E%3C/path%3E%3C/svg%3E");
+        background-size: cover;
+        /* CORRECCIÓN: Esta línea asegura que la ola siempre sea visible */
+        background-position: top center;
+        z-index: 1;
+    }
+
+    /* Estilos de las Tarjetas de Etapa */
+    .stage-card {
+        background-color: #fff;
+        border-radius: 1rem;
+        border: 1px solid #e9ecef;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.05);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .stage-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 35px rgba(112, 61, 128, 0.15);
+    }
+    
+    .stage-card:hover .stage-icon-wrapper {
+        transform: scale(1.1);
+        box-shadow: 0 6px 20px rgba(243, 191, 77, 0.5);
+    }
+
+    .stage-icon-wrapper {
+        background-color: var(--claret-yellow);
+        border-radius: 50%;
+        width: 60px;
         height: 60px;
         display: flex;
         align-items: center;
         justify-content: center;
+        font-size: 1.8rem;
+        box-shadow: 0 4px 10px rgba(243, 191, 77, 0.4);
+        color: var(--claret-purple);
+        flex-shrink: 0;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
-    .hover-shadow {
-        transition: all 0.3s ease-in-out;
+    
+    .stage-title {
+        font-weight: 600;
+        color: var(--claret-purple);
     }
-    .hover-shadow:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    
+    .stage-age {
+        font-size: 0.9em;
+        font-weight: 500;
+    }
+    
+    .btn-book-visit {
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        border-radius: 50px;
+        background-color: var(--claret-purple);
+        border-color: var(--claret-purple);
+        transition: transform 0.2s ease, background-color 0.2s ease;
+    }
+    
+    .btn-book-visit:hover {
+        transform: scale(1.05);
+        background-color: var(--claret-purple-dark);
+        border-color: var(--claret-purple-dark);
+    }
+    
+    /* Animaciones */
+    .animated-card {
+        opacity: 0;
+        transform: translateY(30px);
+        transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+    }
+    .animated-card.is-visible {
+        opacity: 1;
+        transform: translateY(0);
     }
 </style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Script para animar las tarjetas al hacer scroll
+    document.addEventListener("DOMContentLoaded", function() {
+        const animatedCards = document.querySelectorAll('.animated-card');
+        if ("IntersectionObserver" in window) {
+            const cardObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('is-visible');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.1 });
+            animatedCards.forEach(card => cardObserver.observe(card));
+        } else {
+            // Fallback para navegadores antiguos: simplemente muestra las tarjetas
+            animatedCards.forEach(card => {
+                card.classList.add('is-visible');
+            });
+        }
+    });
+</script>
 {% endblock %}
