@@ -139,7 +139,15 @@ function initializeDataTable() {
             { 
                 data: 'stage_name', 
                 orderable: true,
-                searchable: true
+                searchable: true,
+                render: function (data, type, row) {
+                    let html = `<div><strong>${data}</strong>`;
+                    if (row.course_name) {
+                        html += `<br><small class="text-muted">${row.course_name}</small>`;
+                    }
+                    html += '</div>';
+                    return html;
+                }
             },
             { 
                 data: 'status',
@@ -225,6 +233,12 @@ function initializeEventListeners() {
         appointmentsTable.ajax.reload();
     });
 
+    // Manejar cambio de etapa para cargar cursos
+    $('#stage').on('change', function() {
+        const stageId = $(this).val();
+        loadCoursesForStage(stageId);
+    });
+
     // Botones de exportación
     $('#exportPDF').on('click', function() {
         const currentUrl = new URL(window.location.href);
@@ -275,6 +289,47 @@ function initializeEventListeners() {
 }
 
 // ====================================
+// Course Management
+// ====================================
+function loadCoursesForStage(stageId) {
+    console.log('Loading courses for stage:', stageId);
+    
+    const courseSelect = $('#course');
+    courseSelect.html('<option value="">Cargando cursos...</option>');
+    
+    if (!stageId) {
+        courseSelect.html('<option value="">Seleccione primero una etapa</option>');
+        return;
+    }
+
+    $.ajax({
+        url: `/api/stage/${stageId}/courses/`,
+        type: 'GET',
+        success: function(courses) {
+            console.log('Loaded courses:', courses);
+            
+            if (courses.length === 0) {
+                courseSelect.html('<option value="">No hay cursos específicos para esta etapa</option>');
+                // Si no hay cursos, hacer el campo opcional
+                courseSelect.removeAttr('required');
+            } else {
+                let options = '<option value="">Seleccione un curso</option>';
+                courses.forEach(course => {
+                    options += `<option value="${course.id}">${course.name}</option>`;
+                });
+                courseSelect.html(options);
+                // Si hay cursos, hacer el campo obligatorio
+                courseSelect.attr('required', 'required');
+            }
+        },
+        error: function(xhr) {
+            console.error('Error loading courses:', xhr);
+            courseSelect.html('<option value="">Error cargando cursos</option>');
+        }
+    });
+}
+
+// ====================================
 // Form Validation
 // ====================================
 function initializeValidation() {
@@ -294,6 +349,12 @@ function initializeValidation() {
                 maxlength: 9
             },
             stage: "required",
+            course: {
+                required: function() {
+                    // El curso es requerido solo si hay opciones disponibles (más de 1, excluyendo la opción vacía)
+                    return $('#course option').length > 1 && $('#course option:first').val() === '';
+                }
+            },
             date: "required",
             time: "required",
             status: "required",
@@ -312,6 +373,7 @@ function initializeValidation() {
                 maxlength: "El teléfono debe tener 9 dígitos"
             },
             stage: "Por favor, seleccione una etapa",
+            course: "Por favor, seleccione un curso",
             date: "Por favor, seleccione una fecha",
             time: "Por favor, seleccione una hora",
             status: "Por favor, seleccione un estado",
@@ -368,11 +430,24 @@ function saveAppointment() {
         formData.date = `${dateValue}T${timeValue}`;
     }
     
-    ['visitor_name', 'visitor_email', 'visitor_phone', 'stage', 'status', 
+    // Incluir el campo course en la lista de campos a procesar
+    ['visitor_name', 'visitor_email', 'visitor_phone', 'stage', 'course', 'status', 
      'duration', 'comments', 'notes', 'follow_up_date'].forEach(field => {
-        const value = $(`#${field}`).val();
+        let value = $(`#${field}`).val();
+        
+        if (field === 'course' && (!value || value === '')) {
+            // Si course está vacío, no lo incluimos en el JSON
+            return;
+        }
+        
         if (value !== undefined && value !== null && value !== '') {
-            formData[field] = (field === 'duration') ? parseInt(value) : value;
+            if (field === 'duration') {
+                formData[field] = parseInt(value);
+            } else if (field === 'stage' || field === 'course') {
+                formData[field] = parseInt(value);
+            } else {
+                formData[field] = value;
+            }
         }
     });
 
@@ -382,8 +457,17 @@ function saveAppointment() {
         return;
     }
 
+    // Validar curso si es obligatorio
+    const courseSelect = $('#course');
+    if (courseSelect.attr('required') && !formData.course) {
+        showToast('Por favor, seleccione un curso', 'error');
+        return;
+    }
+
     const saveBtn = $('#saveAppointment');
     const modal = $('#appointmentModal');
+    
+    console.log('Sending data:', formData);
     
     $.ajax({
         url: id ? `${window.APPOINTMENTS_CONFIG.apiUrl}${id}/` : window.APPOINTMENTS_CONFIG.apiUrl,
@@ -397,12 +481,14 @@ function saveAppointment() {
             saveBtn.prop('disabled', true);
         },
         success: function(response) {
+            console.log('Save successful:', response);
             appointmentsTable.ajax.reload();
             showToast('Cita guardada correctamente');
             modal.modal('hide');
             cleanupModal();
         },
         error: function(xhr) {
+            console.error('Save error:', xhr);
             const errorMessage = xhr.responseJSON?.error || 'Error al guardar la cita';
             showToast(errorMessage, 'error');
         },
@@ -463,6 +549,9 @@ function cleanupModal() {
     $('.modal-backdrop').remove();
     $('html').removeClass('modal-open');
     $('body').css('padding-right', '');
+    
+    // Limpiar el select de cursos
+    $('#course').html('<option value="">Seleccione primero una etapa</option>');
 }
 
 function populateForm(data) {
@@ -478,7 +567,7 @@ function populateForm(data) {
         console.log('Date/Time set to:', datetime.format('YYYY-MM-DD HH:mm'));
     }
     
-    // Lista completa de campos incluyendo los nuevos
+    // Lista completa de campos incluyendo course
     ['visitor_name', 'visitor_email', 'visitor_phone', 'stage', 
      'status', 'duration', 'comments', 'notes', 'follow_up_date'].forEach(field => {
         const value = data[field];
@@ -494,4 +583,36 @@ function populateForm(data) {
             console.log(`No value for ${field}`);
         }
     });
+    
+    // Manejar el campo course de forma especial
+    if (data.stage) {
+        // Primero cargar los cursos para la etapa
+        $.ajax({
+            url: `/api/stage/${data.stage}/courses/`,
+            type: 'GET',
+            success: function(courses) {
+                console.log('Loaded courses for editing:', courses);
+                
+                const courseSelect = $('#course');
+                if (courses.length === 0) {
+                    courseSelect.html('<option value="">No hay cursos específicos para esta etapa</option>');
+                    courseSelect.removeAttr('required');
+                } else {
+                    let options = '<option value="">Seleccione un curso</option>';
+                    courses.forEach(course => {
+                        const selected = (data.course && data.course === course.id) ? 'selected' : '';
+                        options += `<option value="${course.id}" ${selected}>${course.name}</option>`;
+                    });
+                    courseSelect.html(options);
+                    courseSelect.attr('required', 'required');
+                }
+                
+                console.log('Course field populated with value:', data.course);
+            },
+            error: function(xhr) {
+                console.error('Error loading courses for editing:', xhr);
+                $('#course').html('<option value="">Error cargando cursos</option>');
+            }
+        });
+    }
 }

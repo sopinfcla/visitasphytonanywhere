@@ -29,9 +29,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Importaciones locales
-from .models import Appointment, SchoolStage, StaffProfile, AvailabilitySlot
+from .models import Appointment, SchoolStage, Course, StaffProfile, AvailabilitySlot
 from .serializers import AppointmentSerializer, AvailabilitySlotSerializer, CalendarDaySerializer
 from .forms import StaffAuthenticationForm
+from .emails import send_appointment_confirmation
 
 # ====================================
 # Part 1.1: Base Functions
@@ -52,15 +53,19 @@ def is_slot_available(staff, datetime_start, duration):
     logger.debug(f"Comprobando disponibilidad del slot para el profesor {staff} a partir de {datetime_start} durante {duration} minutos")
     datetime_end = datetime_start + timedelta(minutes=duration)
     
-    overlapping_appointments = Appointment.objects.filter(
+    # Obtener citas del mismo día
+    existing_appointments = Appointment.objects.filter(
         staff=staff,
-        date__lt=datetime_end,
-        date__gt=datetime_start - timedelta(minutes=duration)
-    ).exists()
+        date__date=datetime_start.date()
+    )
     
-    if overlapping_appointments:
-        logger.info(f"Se encontró una cita solapada para el profesor {staff}")
-        return False
+    # Verificar solapamiento cita por cita
+    for existing_apt in existing_appointments:
+        existing_end = existing_apt.date + timedelta(minutes=existing_apt.duration)
+        # Hay solapamiento si: existing_start < new_end AND existing_end > new_start
+        if existing_apt.date < datetime_end and existing_end > datetime_start:
+            logger.info(f"Se encontró una cita solapada para el profesor {staff}")
+            return False
 
     return True
 
@@ -143,8 +148,8 @@ class PublicBookingView(TemplateView):
         }
 
         stages_list = []
-        # Obtenemos todas las etapas de la base de datos
-        all_stages_from_db = SchoolStage.objects.all()
+        # Obtenemos todas las etapas de la base de datos con cursos
+        all_stages_from_db = SchoolStage.objects.prefetch_related('courses').all()
 
         # Usamos enumerate para obtener un índice para la animación
         for i, stage_obj in enumerate(all_stages_from_db):
@@ -154,6 +159,7 @@ class PublicBookingView(TemplateView):
                 'name': stage_obj.name,
                 'description': stage_obj.description, # Descripción por defecto de la BD
                 'animation_delay': i * 100,
+                'courses_count': stage_obj.courses.count()
             }
             
             # Buscamos los metadatos para esta etapa
@@ -174,9 +180,19 @@ class StageBookingView(TemplateView):
         context = super().get_context_data(**kwargs)
         stage_id = kwargs.get('stage_id')
         stage = get_object_or_404(SchoolStage, id=stage_id)
+        
+        # Obtener cursos de la etapa ordenados
+        courses = Course.objects.filter(stage=stage).order_by('order')
+        
         context.update({
             'stage': stage,
-            'stage_json': json.dumps({'id': stage.id, 'name': stage.name, 'description': stage.description})
+            'courses': courses,
+            'stage_json': json.dumps({
+                'id': stage.id, 
+                'name': stage.name, 
+                'description': stage.description,
+                'courses': [{'id': c.id, 'name': c.name} for c in courses]
+            })
         })
         return context
 
@@ -242,6 +258,13 @@ def staff_by_stage(request, stage_id):
     data = [{'id': s.id, 'name': s.user.get_full_name()} for s in staff]
     return JsonResponse(data, safe=False)
 
+def courses_by_stage(request, stage_id):
+    """Nueva función para obtener cursos por etapa"""
+    logger.debug(f"Obteniendo cursos para la etapa con id {stage_id}")
+    courses = Course.objects.filter(stage_id=stage_id).order_by('order')
+    data = [{'id': c.id, 'name': c.name} for c in courses]
+    return JsonResponse(data, safe=False)
+
 # ====================================
 # Part 3: Availability Functions
 # ====================================
@@ -298,21 +321,60 @@ def book_appointment(request, stage_id, slot_id):
                 
                 appointment_datetime = datetime.combine(slot.date, slot.start_time)
                 appointment_datetime = make_aware(appointment_datetime, get_current_timezone())
+                appointment_end = appointment_datetime + timedelta(minutes=slot.duration)
                 
-                # Verificar disponibilidad con bloqueo
-                if Appointment.objects.select_for_update().filter(
+                # CORRECCIÓN: Verificar disponibilidad con la lógica correcta
+                # Obtener todas las citas del mismo día y staff
+                existing_appointments = Appointment.objects.select_for_update().filter(
                     staff=slot.staff,
-                    date__lt=appointment_datetime + timedelta(minutes=slot.duration),
-                    date__gt=appointment_datetime - timedelta(minutes=slot.duration)
-                ).exists():
+                    date__date=appointment_datetime.date()
+                )
+                
+                # Verificar solapamiento cita por cita
+                has_overlap = False
+                for existing_apt in existing_appointments:
+                    existing_end = existing_apt.date + timedelta(minutes=existing_apt.duration)
+                    # Hay solapamiento si: existing_start < new_end AND existing_end > new_start
+                    if existing_apt.date < appointment_end and existing_end > appointment_datetime:
+                        has_overlap = True
+                        break
+                
+                if has_overlap:
                     return JsonResponse({
                         'error': 'Horario no disponible',
                         'redirect_url': reverse('stage_booking', kwargs={'stage_id': stage_id})
                     }, status=400)
                 
+                # Obtener el curso si se proporciona
+                course = None
+                course_id = request.POST.get('course')
+                
+                # Si la etapa tiene cursos, el curso es obligatorio
+                if stage.courses.exists():
+                    if not course_id:
+                        return JsonResponse({
+                            'error': 'Debes seleccionar un curso para esta etapa educativa'
+                        }, status=400)
+                    
+                    try:
+                        course = Course.objects.get(id=course_id, stage=stage)
+                    except Course.DoesNotExist:
+                        return JsonResponse({
+                            'error': 'Curso seleccionado no válido para esta etapa'
+                        }, status=400)
+                elif course_id:
+                    # Si la etapa no tiene cursos pero se envió un course_id
+                    try:
+                        course = Course.objects.get(id=course_id, stage=stage)
+                    except Course.DoesNotExist:
+                        return JsonResponse({
+                            'error': 'Curso seleccionado no válido para esta etapa'
+                        }, status=400)
+                
                 # Crear la cita
                 appointment = Appointment.objects.create(
                     stage=stage,
+                    course=course,
                     staff=slot.staff,
                     visitor_name=request.POST.get('visitor_name'),
                     visitor_email=request.POST.get('visitor_email'),
@@ -330,11 +392,9 @@ def book_appointment(request, stage_id, slot_id):
                     # No revertimos la creación de la cita si falla el email
                 
                 # Eliminar slots solapados
-                appointment_end = appointment_datetime + timedelta(minutes=slot.duration)
                 AvailabilitySlot.objects.filter(
                     staff=slot.staff,
-                    date=slot.date
-                ).filter(
+                    date=slot.date,
                     start_time__lt=appointment_end.time(),
                     end_time__gt=appointment_datetime.time()
                 ).delete()
@@ -348,13 +408,17 @@ def book_appointment(request, stage_id, slot_id):
                 
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
-            
+    
+    # GET request - mostrar formulario con cursos
+    courses = Course.objects.filter(stage=stage).order_by('order')
     context = {
         'stage': stage,
         'slot': slot,
+        'courses': courses,
         'staff_name': slot.staff.user.get_full_name()
     }
     return render(request, 'visits/book_appointment.html', context)
+
 # ====================================
 # Part 5: Staff Availability
 # ====================================
@@ -619,7 +683,7 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             
             if appointment_id:
                 # Construir query base
-                appointment_query = Appointment.objects.select_related('stage')
+                appointment_query = Appointment.objects.select_related('stage', 'course')
                 
                 # Si es supervisor, permitir ver todas las citas
                 if is_supervisor:
@@ -637,7 +701,7 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                 return JsonResponse(response_data)
 
             # Para listados, usar el mismo enfoque de permisos
-            queryset = Appointment.objects.select_related('stage', 'staff__user')
+            queryset = Appointment.objects.select_related('stage', 'course', 'staff__user')
             if not is_supervisor:
                 queryset = queryset.filter(staff=request.user.staffprofile)
 
@@ -647,7 +711,8 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                     Q(visitor_name__icontains=search) |
                     Q(visitor_email__icontains=search) |
                     Q(visitor_phone__icontains=search) |
-                    Q(stage__name__icontains=search)
+                    Q(stage__name__icontains=search) |
+                    Q(course__name__icontains=search)
                 )
 
             stage = request.GET.get('stage')
@@ -691,6 +756,8 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                     'visitor_phone': appointment.visitor_phone,
                     'stage': appointment.stage.id if appointment.stage else None,
                     'stage_name': appointment.stage.name if appointment.stage else '',
+                    'course': appointment.course.id if appointment.course else None,
+                    'course_name': appointment.course.name if appointment.course else '',
                     'status': appointment.status,
                     'duration': appointment.duration,
                     'staff_id': appointment.staff.id,
@@ -737,13 +804,24 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                 logger.error(f"Error parsing date: {str(e)}")
                 return JsonResponse({'error': 'Formato de fecha inválido'}, status=400)
 
-            # 4. Verificar solapamientos
-            staff_id = data['staff']  # Ahora podemos usar data['staff'] con seguridad
-            overlap = Appointment.objects.filter(
+            # 4. Verificar solapamientos - CORRECCIÓN
+            staff_id = data['staff']
+            duration = data.get('duration', 60)
+            appointment_end = appointment_date + timedelta(minutes=duration)
+            
+            # Obtener citas del mismo día y staff
+            existing_appointments = Appointment.objects.filter(
                 staff_id=staff_id,
-                date__lt=appointment_date + timedelta(minutes=data.get('duration', 60)),
-                date__gt=appointment_date - timedelta(minutes=data.get('duration', 60))
-            ).exists()
+                date__date=appointment_date.date()
+            )
+            
+            # Verificar solapamiento
+            overlap = False
+            for existing_apt in existing_appointments:
+                existing_end = existing_apt.date + timedelta(minutes=existing_apt.duration)
+                if existing_apt.date < appointment_end and existing_end > appointment_date:
+                    overlap = True
+                    break
 
             if overlap:
                 return JsonResponse({
@@ -815,14 +893,25 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                 if not isinstance(duration, int) or duration not in [15, 30, 45, 60]:
                     return JsonResponse({'error': 'Duración inválida'}, status=400)
 
-            # Verificar solapamientos si la fecha cambia
+            # Verificar solapamientos si la fecha cambia - CORRECCIÓN
             if 'date' in data:
                 staff_id = data.get('staff', appointment.staff_id)
-                overlap = Appointment.objects.filter(
+                duration = data.get('duration', appointment.duration)
+                appointment_end = data['date'] + timedelta(minutes=duration)
+                
+                # Obtener citas del mismo día y staff (excluyendo la actual)
+                existing_appointments = Appointment.objects.filter(
                     staff_id=staff_id,
-                    date__lt=data['date'] + timedelta(minutes=data.get('duration', appointment.duration)),
-                    date__gt=data['date'] - timedelta(minutes=data.get('duration', appointment.duration))
-                ).exclude(id=appointment_id).exists()
+                    date__date=data['date'].date()
+                ).exclude(id=appointment_id)
+                
+                # Verificar solapamiento
+                overlap = False
+                for existing_apt in existing_appointments:
+                    existing_end = existing_apt.date + timedelta(minutes=existing_apt.duration)
+                    if existing_apt.date < appointment_end and existing_end > data['date']:
+                        overlap = True
+                        break
 
                 if overlap:
                     return JsonResponse({
@@ -890,16 +979,17 @@ class AppointmentConfirmationView(TemplateView):
         context = super().get_context_data(**kwargs)
         appointment_id = kwargs.get('appointment_id')
         appointment = get_object_or_404(
-            Appointment.objects.select_related('stage', 'staff', 'staff__user'),
+            Appointment.objects.select_related('stage', 'course', 'staff', 'staff__user'),
             id=appointment_id
         )
         context.update({
             'appointment': appointment,
             'staff_name': appointment.staff.user.get_full_name(),
             'stage_name': appointment.stage.name,
+            'course_name': appointment.course.name if appointment.course else None,
             'date': appointment.date.strftime('%d/%m/%Y'),
             'time': appointment.date.strftime('%H:%M'),
-            'duration': appointment.duration
+            'duration': appointment.duration  # Duración dinámica del slot
         })
         return context
     
@@ -949,7 +1039,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             # Citas del usuario actual
             context['appointments'] = Appointment.objects.filter(
                 staff=staff_profile
-            ).select_related('stage')
+            ).select_related('stage', 'course')
 
             # Generar horas disponibles (8:00 - 20:00)
             available_hours = []
@@ -1006,7 +1096,7 @@ class DashboardCalendarView(LoginRequiredMixin, View):
                 return JsonResponse({'error': str(e)}, status=400)
 
             # Construir query base
-            appointments_query = Appointment.objects.select_related('stage', 'staff__user')
+            appointments_query = Appointment.objects.select_related('stage', 'course', 'staff__user')
             
             # Aplicar filtros según permisos
             if is_supervisor:
@@ -1028,9 +1118,10 @@ class DashboardCalendarView(LoginRequiredMixin, View):
             events = []
             for apt in appointments:
                 end_time = apt.date + timedelta(minutes=apt.duration)
+                course_info = f" - {apt.course.name}" if apt.course else ""
                 event = {
                     'id': apt.id,
-                    'title': f'{apt.visitor_name}',
+                    'title': f'{apt.visitor_name}{course_info}',
                     'start': apt.date.isoformat(),
                     'end': end_time.isoformat(),
                     'backgroundColor': self._get_status_color(apt.status),
@@ -1039,6 +1130,7 @@ class DashboardCalendarView(LoginRequiredMixin, View):
                         'staffId': apt.staff.id,
                         'status': apt.status,
                         'stage': apt.stage.name,
+                        'course': apt.course.name if apt.course else '',
                         'visitor_name': apt.visitor_name,
                         'visitor_email': apt.visitor_email,
                         'visitor_phone': apt.visitor_phone,
@@ -1085,7 +1177,7 @@ class DashboardStatsView(LoginRequiredMixin, View):
             today_end = today_start + timedelta(days=1)
             
             # Determinar el queryset base según los permisos
-            base_queryset = Appointment.objects.select_related('stage', 'staff__user')
+            base_queryset = Appointment.objects.select_related('stage', 'course', 'staff__user')
             
             if is_supervisor:
                 if staff_id == 'global':
@@ -1159,6 +1251,7 @@ class DashboardStatsView(LoginRequiredMixin, View):
                         'id': apt.id,
                         'visitor_name': apt.visitor_name,
                         'stage': apt.stage.name,
+                        'course': apt.course.name if apt.course else '',
                         'date': timezone.localtime(apt.date).isoformat(),
                         'time': timezone.localtime(apt.date).strftime('%H:%M'),
                         'status': apt.status,
@@ -1213,7 +1306,7 @@ class AppointmentExportView(LoginRequiredMixin, View):
         if status:
             appointments = appointments.filter(status=status)
             
-        return appointments
+        return appointments.select_related('stage', 'course', 'staff__user')
 
     def generate_pdf(self, appointment_id=None):
         """Genera un PDF con los datos de la(s) cita(s)"""
@@ -1264,6 +1357,7 @@ class AppointmentExportView(LoginRequiredMixin, View):
                 ["Email:", appointment.visitor_email],
                 ["Teléfono:", appointment.visitor_phone],
                 ["Etapa:", appointment.stage.name],
+                ["Curso:", appointment.course.name if appointment.course else "No especificado"],
                 ["Fecha:", appointment.date.strftime("%d/%m/%Y")],
                 ["Hora:", appointment.date.strftime("%H:%M")],
                 ["Estado:", dict(Appointment.STATUS_CHOICES)[appointment.status]],
@@ -1293,13 +1387,14 @@ class AppointmentExportView(LoginRequiredMixin, View):
             ])
         else:
             # Para múltiples citas, formato de lista
-            data = [["Fecha", "Hora", "Visitante", "Etapa", "Estado"]]
+            data = [["Fecha", "Hora", "Visitante", "Etapa", "Curso", "Estado"]]
             for apt in appointments:
                 data.append([
                     apt.date.strftime("%d/%m/%Y"),
                     apt.date.strftime("%H:%M"),
                     apt.visitor_name,
                     apt.stage.name,
+                    apt.course.name if apt.course else "-",
                     dict(Appointment.STATUS_CHOICES)[apt.status]
                 ])
             
@@ -1327,7 +1422,7 @@ class AppointmentExportView(LoginRequiredMixin, View):
         if appointment_id:
             col_widths = [2.5*inch, 4*inch]
         else:
-            col_widths = [1.2*inch, 1*inch, 2*inch, 1.8*inch, 1.5*inch]
+            col_widths = [1*inch, 0.8*inch, 1.8*inch, 1.5*inch, 1.5*inch, 1*inch]
         
         table = Table(data, colWidths=col_widths, repeatRows=1)
         table.setStyle(table_style)
@@ -1373,7 +1468,7 @@ class AppointmentExportView(LoginRequiredMixin, View):
         })
         
         # Encabezados
-        headers = ['Fecha', 'Hora', 'Visitante', 'Email', 'Teléfono', 'Etapa', 'Estado', 'Duración', 'Comentarios']
+        headers = ['Fecha', 'Hora', 'Visitante', 'Email', 'Teléfono', 'Etapa', 'Curso', 'Estado', 'Duración', 'Comentarios']
         for col, header in enumerate(headers):
             worksheet.write(0, col, header, header_format)
             worksheet.set_column(col, col, 15)  # Ancho de columna
@@ -1388,6 +1483,7 @@ class AppointmentExportView(LoginRequiredMixin, View):
                 apt.visitor_email,
                 apt.visitor_phone,
                 apt.stage.name,
+                apt.course.name if apt.course else "",
                 dict(Appointment.STATUS_CHOICES)[apt.status],
                 f"{apt.duration} min",
                 apt.comments or ""

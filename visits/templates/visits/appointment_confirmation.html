@@ -15,6 +15,9 @@
                     <div class="mb-4">
                         <h5 class="text-secondary mb-3">Detalles de la cita</h5>
                         <p class="h4 mb-0">{{ appointment.stage.name }}</p>
+                        {% if appointment.course %}
+                        <p class="text-muted mt-1">{{ appointment.course.name }}</p>
+                        {% endif %}
                     </div>
                     
                     <hr class="my-4">
@@ -40,19 +43,28 @@
                         </div>
                         <div class="col-md-6 mb-3">
                             <div class="d-flex align-items-center">
-                                <i class="fas fa-map-marker-alt text-primary me-3"></i>
+                                <i class="fas fa-hourglass-half text-primary me-3"></i>
                                 <div>
-                                    <small class="text-secondary">Lugar</small>
-                                    <p class="mb-0">Avenida Padre Claret, 3<br>Segovia</p>
+                                    <small class="text-secondary">Duración</small>
+                                    <p class="mb-0">{{ appointment.duration }} minutos</p>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6 mb-3">
                             <div class="d-flex align-items-center">
                                 <i class="fas fa-user-tie text-primary me-3"></i>
                                 <div>
                                     <small class="text-secondary">Atendido por</small>
                                     <p class="mb-0">{{ appointment.staff }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 mb-3">
+                            <div class="d-flex align-items-start">
+                                <i class="fas fa-map-marker-alt text-primary me-3 mt-1"></i>
+                                <div>
+                                    <small class="text-secondary">Lugar</small>
+                                    <p class="mb-0">Avenida Padre Claret, 3<br>Segovia</p>
                                 </div>
                             </div>
                         </div>

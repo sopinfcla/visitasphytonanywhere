@@ -38,6 +38,7 @@ urlpatterns = [
     # API endpoints
     path('api/stage/<int:stage_id>/availability/', views.get_stage_availability, name='stage_availability'),
     path('api/stage/<int:stage_id>/staff/', views.staff_by_stage, name='staff_by_stage'),
+    path('api/stage/<int:stage_id>/courses/', views.courses_by_stage, name='courses_by_stage'),
     path('api/availability/', views.StaffAvailabilityView.as_view(), name='api_availability'),
     path('api/availability/<int:slot_id>/', views.StaffAvailabilityView.as_view(), name='api_delete_availability'),
     

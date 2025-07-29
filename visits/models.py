@@ -24,6 +24,19 @@ class SchoolStage(models.Model):
     def __str__(self):
         return self.name
 
+class Course(models.Model):
+    """Modelo para los cursos específicos dentro de cada etapa"""
+    stage = models.ForeignKey(SchoolStage, on_delete=models.CASCADE, related_name='courses')
+    name = models.CharField(max_length=100)
+    order = models.PositiveIntegerField(default=1, help_text="Orden de visualización dentro de la etapa")
+    
+    class Meta:
+        ordering = ['stage', 'order']
+        unique_together = ['stage', 'name']
+    
+    def __str__(self):
+        return f"{self.stage.name} - {self.name}"
+
 class StaffProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     allowed_stages = models.ManyToManyField(SchoolStage)
@@ -76,6 +89,8 @@ class Appointment(models.Model):
     ]
     
     stage = models.ForeignKey(SchoolStage, on_delete=models.CASCADE)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, null=True, blank=True, 
+                              help_text="Curso específico dentro de la etapa")
     staff = models.ForeignKey(StaffProfile, on_delete=models.CASCADE)
     visitor_name = models.CharField(max_length=200)
     visitor_email = models.EmailField()
@@ -103,6 +118,14 @@ class Appointment(models.Model):
     
     def clean(self):
         logger.debug(f"Validando la cita para {self.visitor_name} programada para {self.date}")
+        
+        # Si se especifica un curso, debe corresponder a la etapa seleccionada
+        if self.course and self.stage and self.course.stage != self.stage:
+            logger.warning(f"El curso {self.course} no pertenece a la etapa {self.stage}")
+            raise ValidationError({
+                'course': _('El curso seleccionado no pertenece a la etapa elegida.')
+            })
+        
         if not self.pk:
             if self.staff and self.stage and self.stage not in self.staff.allowed_stages.all():
                 logger.warning(f"El profesor {self.staff} no está autorizado para atender la etapa {self.stage}")
@@ -132,7 +155,8 @@ class Appointment(models.Model):
         super().save(*args, **kwargs)
     
     def __str__(self):
-        return f"{self.visitor_name} - {self.date}"
+        course_info = f" - {self.course.name}" if self.course else ""
+        return f"{self.visitor_name} - {self.stage.name}{course_info} - {self.date}"
 
 # ====================================
 # Part 4: Availability Management

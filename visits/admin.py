@@ -1,15 +1,45 @@
 from django.contrib import admin
 from django.utils import timezone
 from django.utils.html import format_html
-from .models import SchoolStage, StaffProfile, Appointment, AvailabilitySlot
+from .models import SchoolStage, Course, StaffProfile, Appointment, AvailabilitySlot
+
+# ====================================
+# CourseInline para SchoolStageAdmin
+# ====================================
+class CourseInline(admin.TabularInline):
+    model = Course
+    extra = 1
+    fields = ('name', 'order')
+    ordering = ('order',)
+
+# ====================================
+# CourseAdmin
+# ====================================
+@admin.register(Course)
+class CourseAdmin(admin.ModelAdmin):
+    list_display = ['name', 'stage', 'order']
+    list_filter = ['stage']
+    search_fields = ['name', 'stage__name']
+    ordering = ['stage', 'order']
+    
+    fieldsets = (
+        (None, {
+            'fields': ('stage', 'name', 'order')
+        }),
+    )
 
 # ====================================
 # SchoolStageAdmin
 # ====================================
 @admin.register(SchoolStage)
 class SchoolStageAdmin(admin.ModelAdmin):
-    list_display = ['name', 'description', 'staff_count']
+    list_display = ['name', 'description', 'courses_count', 'staff_count']
     search_fields = ['name']
+    inlines = [CourseInline]
+
+    def courses_count(self, obj):
+        return obj.courses.count()
+    courses_count.short_description = 'Cursos'
 
     def staff_count(self, obj):
         return obj.staffprofile_set.count()
@@ -76,8 +106,8 @@ class StaffProfileAdmin(admin.ModelAdmin):
 # ====================================
 @admin.register(Appointment)
 class AppointmentAdmin(admin.ModelAdmin):
-    list_display = ['visitor_name', 'stage', 'staff', 'formatted_date', 'status', 'visitor_email', 'visitor_phone']
-    list_filter = ['stage', 'staff', 'date', 'status']
+    list_display = ['visitor_name', 'stage', 'course_display', 'staff', 'formatted_date', 'status', 'visitor_email', 'visitor_phone']
+    list_filter = ['stage', 'course', 'staff', 'date', 'status']
     search_fields = ['visitor_name', 'visitor_email', 'visitor_phone']
     date_hierarchy = 'date'
     readonly_fields = ['created_at']
@@ -87,7 +117,7 @@ class AppointmentAdmin(admin.ModelAdmin):
             'fields': ('visitor_name', 'visitor_email', 'visitor_phone')
         }),
         ('Detalles de la cita', {
-            'fields': ('stage', 'staff', 'date', 'duration', 'status')
+            'fields': ('stage', 'course', 'staff', 'date', 'duration', 'status')
         }),
         ('Notas y seguimiento', {
             'fields': ('comments', 'notes', 'follow_up_date'),
@@ -98,6 +128,10 @@ class AppointmentAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+    def course_display(self, obj):
+        return obj.course.name if obj.course else '-'
+    course_display.short_description = 'Curso'
 
     def formatted_date(self, obj):
         local_dt = timezone.localtime(obj.date)

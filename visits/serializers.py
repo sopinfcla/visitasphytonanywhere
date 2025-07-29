@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Appointment, AvailabilitySlot, SchoolStage
+from .models import Appointment, AvailabilitySlot, SchoolStage, Course
 from django.utils.timezone import make_aware, localtime
 from datetime import datetime, timedelta
 
@@ -10,6 +10,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
     end = serializers.SerializerMethodField(read_only=True)
     
     stage_name = serializers.CharField(source='stage.name', read_only=True)
+    course_name = serializers.CharField(source='course.name', read_only=True)
     fecha_y_hora = serializers.SerializerMethodField(read_only=True)
     status = serializers.CharField(required=False, default='pending')
 
@@ -17,7 +18,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
         model = Appointment
         fields = [
             'id', 'visitor_name', 'visitor_email', 'visitor_phone',
-            'stage', 'stage_name', 'status', 'comments', 'staff', 'date',
+            'stage', 'stage_name', 'course', 'course_name', 'status', 'comments', 'staff', 'date',
             'duration', 'title', 'start', 'end', 'fecha_y_hora',
             'notes', 'follow_up_date'
         ]
@@ -28,11 +29,13 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'visitor_phone': {'required': True},
             'stage': {'required': True},
             'date': {'required': True},
-            'duration': {'required': True}
+            'duration': {'required': True},
+            'course': {'required': False}
         }
 
     def get_title(self, obj):
-        return f"{obj.visitor_name} - {obj.stage.name}"
+        course_info = f" - {obj.course.name}" if obj.course else ""
+        return f"{obj.visitor_name} - {obj.stage.name}{course_info}"
 
     def get_start(self, obj):
         return obj.date
@@ -58,6 +61,27 @@ class AppointmentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'duration': 'La duración debe ser 15, 30, 45 o 60 minutos.'
             })
+
+        # Validar que el curso sea obligatorio si la etapa tiene cursos
+        if 'stage' in data:
+            stage = data['stage']
+            course = data.get('course')
+            
+            # Si la etapa tiene cursos, el curso es obligatorio
+            if hasattr(stage, 'courses') and stage.courses.exists():
+                if not course:
+                    raise serializers.ValidationError({
+                        'course': 'Debes seleccionar un curso para esta etapa educativa.'
+                    })
+
+        # Validar que el curso pertenece a la etapa (si se proporciona)
+        if 'course' in data and data['course'] and 'stage' in data:
+            course = data['course']
+            stage = data['stage']
+            if course.stage != stage:
+                raise serializers.ValidationError({
+                    'course': 'El curso seleccionado no pertenece a la etapa elegida.'
+                })
 
         return data
 
@@ -125,3 +149,12 @@ class SlotDetailSerializer(serializers.ModelSerializer):
         fecha = obj.date.strftime('%d/%m/%Y')
         hora = obj.start_time.strftime('%H:%M')
         return f"{fecha} {hora}"
+
+
+class CourseSerializer(serializers.ModelSerializer):
+    """Serializer for Course model"""
+    stage_name = serializers.CharField(source='stage.name', read_only=True)
+    
+    class Meta:
+        model = Course
+        fields = ['id', 'name', 'stage', 'stage_name', 'order']

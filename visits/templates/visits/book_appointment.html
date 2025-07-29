@@ -13,7 +13,7 @@
                 <div class="mb-4 pb-4 border-bottom">
                     <div class="d-flex align-items-center mb-3">
                         <i class="far fa-clock text-primary me-2"></i>
-                        <span>30 min</span>
+                        <span>{{ slot.duration }} min</span>
                     </div>
                     <div class="d-flex align-items-start mb-3">
                         <i class="fas fa-map-marker-alt text-primary me-2 mt-1"></i>
@@ -76,6 +76,24 @@
                             </div>
                         </div>
 
+                        {% if courses %}
+                        <div class="mb-3">
+                            <label for="course" class="form-label">CURSO</label>
+                            <select class="form-select" id="course" name="course" required>
+                                <option value="">Selecciona el curso de tu interés</option>
+                                {% for course in courses %}
+                                <option value="{{ course.id }}">{{ course.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="invalid-feedback">
+                                Por favor selecciona un curso
+                            </div>
+                            <small class="form-text text-muted">
+                                Selecciona el curso específico dentro de {{ stage.name }} para el que deseas la visita.
+                            </small>
+                        </div>
+                        {% endif %}
+
                         <div class="mb-3">
                             <label for="comments" class="form-label">COMENTARIOS (OPCIONAL)</label>
                             <textarea class="form-control" id="comments" name="comments" 
@@ -113,7 +131,7 @@
     padding: 0.5rem 0.75rem;
     font-size: 0.95rem;
 }
-.form-control:focus {
+.form-control:focus, .form-select:focus {
     border-color: #0053f0;
     box-shadow: 0 0 0 3px rgba(0,83,240,0.1);
 }
@@ -147,6 +165,19 @@
 .invalid-feedback {
     font-size: 0.8rem;
 }
+.form-select {
+    border-color: #e5e7eb;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.95rem;
+}
+.form-select.is-invalid {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
+.form-select.is-valid {
+    border-color: #198754;
+    box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.1);
+}
 </style>
 {% endblock %}
 
@@ -176,6 +207,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // Validación del curso
+    const courseSelect = document.getElementById('course');
+    if (courseSelect) {
+        courseSelect.addEventListener('change', function(e) {
+            if (this.value) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } else if (this.hasAttribute('required')) {
+                this.classList.remove('is-valid');
+                this.classList.add('is-invalid');
+            }
+        });
+    }
+    
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -183,6 +228,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (phoneInput.value.length !== 9) {
             phoneInput.classList.add('is-invalid');
             return;
+        }
+        
+        // Validar curso si el selector existe y es requerido
+        const courseSelect = document.getElementById('course');
+        if (courseSelect && courseSelect.hasAttribute('required') && !courseSelect.value) {
+            courseSelect.classList.add('is-invalid');
+            courseSelect.focus();
+            return;
+        } else if (courseSelect) {
+            courseSelect.classList.remove('is-invalid');
         }
         
         try {
@@ -206,5 +261,6 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Error al procesar la reserva');
         }
     });
-});</script>
+});
+</script>
 {% endblock %}
