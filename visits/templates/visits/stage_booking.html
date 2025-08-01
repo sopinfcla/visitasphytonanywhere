@@ -16,13 +16,28 @@
         <div class="col-12 col-md-3 mb-4">
             <div class="mb-4">
                 <h3 class="h4 mb-3">{{ stage.name }}</h3>
-                <div class="d-flex align-items-center text-secondary mb-2">
-                    <i class="far fa-clock me-2"></i>
-                    <span class="fs-6">30 min</span>
-                </div>
-                <div class="d-flex align-items-start text-secondary">
+                <div class="d-flex align-items-start text-secondary mb-2">
                     <i class="fas fa-map-marker-alt me-2 mt-1"></i>
                     <span class="fs-6">Avenida Padre Claret, 3<br>Segovia</span>
+                </div>
+                <div class="d-flex align-items-center text-secondary mb-2">
+                    <i class="fas fa-phone me-2"></i>
+                    <span class="fs-6">921 42 03 00</span>
+                </div>
+                <div class="d-flex align-items-center text-secondary">
+                    <i class="fas fa-envelope me-2"></i>
+                    <span class="fs-6">colegio@claret.es</span>
+                </div>
+            </div>
+            
+            <!-- Mensaje de contacto alternativo - Solo si hay slots -->
+            <div id="contactMessage" class="alert alert-info d-none">
+                <div class="d-flex align-items-start">
+                    <i class="fas fa-info-circle text-info me-2 mt-1"></i>
+                    <div>
+                        <h6 class="alert-heading mb-2">¿No encuentras un horario conveniente?</h6>
+                        <p class="mb-0 small">Llámanos para concertar una cita personalizada</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -45,6 +60,37 @@
                         </div>
                     </div>
                     <div id="calendar"></div>
+                    
+                    <!-- Estado sin horarios disponibles -->
+                    <div id="no-availability-message" class="text-center py-5 d-none">
+                        <div class="mb-4">
+                            <i class="fas fa-calendar-times text-muted" style="font-size: 3rem;"></i>
+                        </div>
+                        <h5 class="text-muted mb-3">No hay horarios disponibles</h5>
+                        <p class="text-muted mb-4">
+                            Actualmente no hay horarios disponibles para esta etapa educativa.
+                        </p>
+                        <div class="alert alert-primary mx-4">
+                            <div class="d-flex align-items-start">
+                                <i class="fas fa-phone text-primary me-3 mt-1"></i>
+                                <div class="text-start">
+                                    <h6 class="alert-heading mb-2">Contacta con nosotros</h6>
+                                    <p class="mb-2">Para concertar una cita personalizada:</p>
+                                    <div class="small">
+                                        <div class="mb-1">
+                                            <strong>Teléfono:</strong> 921 42 03 00
+                                        </div>
+                                        <div>
+                                            <strong>Email:</strong> colegio@claret.es
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <a href="{% url 'public_booking' %}" class="btn btn-outline-primary mt-3">
+                            <i class="fas fa-arrow-left me-2"></i>Volver a etapas
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -242,7 +288,47 @@
     color: #666;
 }
 
-/* 7. Loading States */
+/* 7. Contact Messages */
+.alert-info {
+    background-color: rgba(13, 110, 253, 0.1);
+    border-color: rgba(13, 110, 253, 0.2);
+    color: #084298;
+    border-radius: 8px;
+    font-size: 0.875rem;
+}
+
+.alert-primary {
+    background-color: rgba(13, 110, 253, 0.1);
+    border-color: rgba(13, 110, 253, 0.2);
+    color: #0969da;
+    border-radius: 8px;
+}
+
+#contactMessage {
+    animation: slideInUp 0.4s ease-out;
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+#no-availability-message {
+    padding: 3rem 2rem;
+}
+
+#no-availability-message .alert {
+    text-align: left;
+    margin: 0 1rem;
+}
+
+/* 8. Loading States */
 .loading-spinner {
     width: 24px;
     height: 24px;
@@ -279,6 +365,10 @@
 document.addEventListener('DOMContentLoaded', function() {
     // 1. Inicialización y configuración básica
     console.log('DEBUG - Page loaded');
+    
+    // CORRECCIÓN: Obtener datos de stage desde el template
+    const stageData = {{ stage_json|safe }};
+    console.log('DEBUG - Stage data:', stageData);
     
     const monthNames = [
         'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
@@ -348,13 +438,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 day.classList.remove('fc-day-has-slots');
             });
             
-            const response = await fetch(`/api/stage/{{ stage.id }}/availability/`);
+            // CORRECCIÓN: URL corregida para coincidir con el endpoint en urls.py
+            const response = await fetch(`/api/stage/${stageData.id}/availability/`);
             console.log('DEBUG - Available dates response status:', response.status);
             
-            if (!response.ok) throw new Error('Error cargando fechas');
+            if (!response.ok) {
+                console.error('DEBUG - Response not OK:', response.status, response.statusText);
+                throw new Error('Error cargando fechas');
+            }
             
             const availableDates = await response.json();
             console.log('DEBUG - Available dates:', availableDates);
+            
+            // Si no hay fechas disponibles en absoluto, mostrar mensaje
+            if (!availableDates || availableDates.length === 0) {
+                document.getElementById('calendar').style.display = 'none';
+                document.getElementById('no-availability-message').classList.remove('d-none');
+                return;
+            } else {
+                document.getElementById('calendar').style.display = 'block';
+                document.getElementById('no-availability-message').classList.add('d-none');
+            }
             
             availableDates.forEach(dateInfo => {
                 const cell = document.querySelector(`.fc-day[data-date="${dateInfo.date}"]`);
@@ -378,8 +482,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
+            // Mostrar mensaje de contacto alternativo después de cargar si hay slots
+            if (availableDates && availableDates.length > 0) {
+                setTimeout(() => {
+                    document.getElementById('contactMessage').classList.remove('d-none');
+                }, 3000);
+            }
+            
         } catch (error) {
             console.error('DEBUG - Error loading dates:', error);
+            // CORRECCIÓN: Mostrar mensaje de no disponibilidad en caso de error
+            document.getElementById('calendar').style.display = 'none';
+            document.getElementById('no-availability-message').classList.remove('d-none');
         }
     }
     
@@ -404,13 +518,17 @@ document.addEventListener('DOMContentLoaded', function() {
         timeSlotsColumn.style.display = 'block';
         
         try {
-            const url = `/api/stage/{{ stage.id }}/availability/?date=${formattedDate}`;
+            // CORRECCIÓN: URL corregida para coincidir con el endpoint en urls.py
+            const url = `/api/stage/${stageData.id}/availability/?date=${formattedDate}`;
             console.log('DEBUG - Fetching URL:', url);
             
             const response = await fetch(url);
             console.log('DEBUG - Response status:', response.status);
             
-            if (!response.ok) throw new Error('Error en la respuesta del servidor');
+            if (!response.ok) {
+                console.error('DEBUG - Response error:', response.status, response.statusText);
+                throw new Error('Error en la respuesta del servidor');
+            }
             
             const slots = await response.json();
             console.log('DEBUG - Received slots:', slots);
@@ -422,7 +540,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 container.innerHTML = `
                     <div class="no-slots-message">
                         <i class="fas fa-calendar-times"></i>
-                        <p>No hay horarios disponibles</p>
+                        <p>No hay horarios disponibles para esta fecha</p>
+                        <div class="mt-3 p-3 bg-light rounded">
+                            <small class="text-muted">
+                                <strong>¿Necesitas una cita urgente?</strong><br>
+                                Llámanos al <strong>921 42 03 00</strong>
+                            </small>
+                        </div>
                     </div>`;
                 timeSlotsColumn.classList.add('show');
                 return;
@@ -432,8 +556,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('DEBUG - Creating button for slot:', slot);
                 const button = document.createElement('button');
                 button.className = 'btn w-100 mb-2';
-                button.innerHTML = slot.time;
-                button.onclick = () => window.location.href = `/stage/{{ stage.id }}/book/${slot.id}/`;
+                button.innerHTML = slot.start_time || slot.time;
+                button.onclick = () => window.location.href = `/stage/${stageData.id}/book/${slot.id}/`;
                 container.appendChild(button);
             });
             
@@ -445,6 +569,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="error-message">
                     <i class="fas fa-exclamation-circle"></i>
                     <p>Error cargando horarios</p>
+                    <div class="mt-3 p-3 bg-light rounded">
+                        <small class="text-muted">
+                            <strong>Prueba a contactar directamente:</strong><br>
+                            Teléfono: <strong>921 42 03 00</strong>
+                        </small>
+                    </div>
                 </div>`;
         } finally {
             currentlyLoadingDate = null;

@@ -62,42 +62,87 @@
     background-color: var(--primary-color);
     border-color: var(--primary-color);
 }
+
+/* CORRECCIÓN: Estilos mejorados para eventos del calendario */
 .fc .fc-event {
-    border-radius: 6px;
-    padding: 3px 6px;
-    cursor: pointer;
-    border: none;
-    font-size: 0.875rem;
+    border-radius: 6px !important;
+    padding: 3px 6px !important;
+    cursor: pointer !important;
+    border: 2px solid !important;
+    font-size: 0.875rem !important;
     max-height: none !important;
     overflow: visible !important;
+    transition: all 0.2s ease !important;
 }
+
 .fc .fc-event-main {
-    padding: 2px 4px;
+    padding: 4px 6px !important;
+    font-weight: 500 !important;
+    color: inherit !important;
 }
+
 .fc .fc-event:hover {
-    transform: scale(1.02);
-    transition: transform 0.2s ease;
+    transform: scale(1.02) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+    transition: transform 0.2s ease !important;
 }
+
+/* CORRECCIÓN CRÍTICA: Estados específicos del calendario */
+.fc .fc-event[style*="#ffc107"] {
+    background-color: #ffc107 !important;
+    border-color: #ffb000 !important;
+    color: #000 !important;
+}
+
+.fc .fc-event[style*="#ffc107"] .fc-event-main {
+    color: #000 !important;
+}
+
+.fc .fc-event[style*="#198754"] {
+    background-color: #198754 !important;
+    border-color: #157347 !important;
+    color: white !important;
+}
+
+.fc .fc-event[style*="#198754"] .fc-event-main {
+    color: white !important;
+}
+
+.fc .fc-event[style*="#dc3545"] {
+    background-color: #dc3545 !important;
+    border-color: #b02a37 !important;
+    color: white !important;
+}
+
+.fc .fc-event[style*="#dc3545"] .fc-event-main {
+    color: white !important;
+}
+
+/* Asegurar que el texto sea visible */
 .fc-event-title {
-    white-space: normal;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-weight: bold !important;
 }
+
 .fc-event-time {
-    font-size: 0.8em;
-    opacity: 0.8;
+    font-size: 0.8em !important;
+    opacity: 0.9 !important;
+    font-weight: normal !important;
 }
+
 .event-stage-badge {
-    display: inline-block;
-    font-size: 0.7rem;
-    padding: 2px 6px;
-    margin-top: 2px;
-    background: rgba(255,255,255,0.2);
-    border-radius: 10px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
+    display: inline-block !important;
+    font-size: 0.7rem !important;
+    padding: 2px 6px !important;
+    margin-top: 2px !important;
+    background: rgba(255,255,255,0.3) !important;
+    border-radius: 10px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
 }
 
 /* Upcoming Appointments */
@@ -356,7 +401,7 @@
     </div>
 </div>
 
-<!-- Appointment Modal -->
+<!-- Modal Form Unificado -->
 <div class="modal fade" id="appointmentModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -368,6 +413,7 @@
                 <form id="appointmentForm" novalidate>
                     <input type="hidden" id="appointment_id" name="appointment_id">
                     <input type="hidden" id="appointment_staff_id" name="staff_id">
+                    <!-- Información del Visitante -->
                     <div class="mb-3">
                         <label for="visitor_name" class="form-label">Nombre del Visitante</label>
                         <input type="text" class="form-control" id="visitor_name" name="visitor_name" required>
@@ -379,8 +425,10 @@
                     <div class="mb-3">
                         <label for="visitor_phone" class="form-label">Teléfono</label>
                         <input type="text" class="form-control" id="visitor_phone" name="visitor_phone" required 
-                               maxlength="9" pattern="[0-9]{9}">
+                               maxlength="9" pattern="[0-9]{9}" 
+                               oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 9)">
                     </div>
+                    <!-- Etapa y Curso -->
                     <div class="mb-3">
                         <label for="stage" class="form-label">Etapa</label>
                         <select class="form-select" id="stage" name="stage" required>
@@ -390,6 +438,13 @@
                             {% endfor %}
                         </select>
                     </div>
+                    <div class="mb-3" id="course-container" style="display: none;">
+                        <label for="course" class="form-label">Curso</label>
+                        <select class="form-select" id="course" name="course">
+                            <option value="">Seleccione primero una etapa</option>
+                        </select>
+                    </div>
+                    <!-- Fecha y Hora -->
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="date" class="form-label">Fecha</label>
@@ -413,6 +468,7 @@
                             </select>
                         </div>
                     </div>
+                    <!-- Estado -->
                     <div class="mb-3">
                         <label for="status" class="form-label">Estado</label>
                         <select class="form-select" id="status" name="status" required>
@@ -421,9 +477,24 @@
                             <option value="cancelled">Cancelada</option>
                         </select>
                     </div>
+                    <!-- Comentarios -->
                     <div class="mb-3">
                         <label for="comments" class="form-label">Comentarios</label>
                         <textarea class="form-control" id="comments" name="comments" rows="2"></textarea>
+                    </div>
+                    <!-- Campos adicionales (ocultos en dashboard por defecto) -->
+                    <div class="advanced-fields" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label for="notes" class="form-label">Notas del Profesor</label>
+                                <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                          placeholder="Notas internas - no visibles para el visitante"></textarea>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="follow_up_date" class="form-label">Fecha de Seguimiento</label>
+                                <input type="date" class="form-control" id="follow_up_date" name="follow_up_date">
+                            </div>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -457,11 +528,15 @@
         apiUrl: '{% url "api_appointments" %}',
         csrfToken: '{{ csrf_token }}',
         staffId: '{{ request.user.staffprofile.id }}',
-        isStaff: {{ request.user.is_staff|yesno:"true,false" }}
+        isStaff: {{ request.user.is_staff|yesno:"true,false" }},
+        isAdvancedMode: false // Campos avanzados ocultos por defecto en dashboard
     };
 </script>
 
 <!-- Application Scripts -->
+<script src="{% static 'visits/js/appointments_crud.js' %}"></script>
+
+<!-- Dashboard-specific script -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     let calendar, stagesChart, hoursChart;
@@ -582,54 +657,35 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         calendar.render();
+        
+        // CORRECCIÓN: Hacer el calendario disponible globalmente
+        window.calendar = calendar;
     }
 
-    // Load Appointment Function
-    function loadAppointment(appointmentId, staffId) {
-        fetch(`${window.APPOINTMENTS_CONFIG.apiUrl}${appointmentId}/`)
-            .then(response => {
-                if (!response.ok) {
-                    if (response.status === 404) {
-                        throw new Error('Cita no encontrada');
-                    }
-                    throw new Error('Error cargando la cita');
-                }
-                return response.json();
-            })
-            .then(data => {
-                // Rellenar el formulario
-                document.getElementById('appointment_id').value = data.id;
-                document.getElementById('appointment_staff_id').value = staffId;
-                document.getElementById('visitor_name').value = data.visitor_name;
-                document.getElementById('visitor_email').value = data.visitor_email;
-                document.getElementById('visitor_phone').value = data.visitor_phone;
-                document.getElementById('stage').value = data.stage;
-                
-                // Formatear la fecha y hora
-                const appointmentDate = new Date(data.date);
-                document.getElementById('date').value = appointmentDate.toISOString().split('T')[0];
-                document.getElementById('time').value = appointmentDate.toTimeString().substr(0, 5);
-                
-                document.getElementById('duration').value = data.duration;
-                document.getElementById('status').value = data.status;
-                document.getElementById('comments').value = data.comments || '';
+    // Utility Functions
+    function formatDate(dateStr) {
+        return new Intl.DateTimeFormat('es', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        }).format(new Date(dateStr));
+    }
 
-                // Configurar el modal según los permisos
-                const canEdit = canEditAppointment(staffId);
-                const modalEl = document.getElementById('appointmentModal');
-                modalEl.classList.toggle('modal-readonly', !canEdit);
-                
-                // Mostrar/ocultar botón de guardar
-                document.getElementById('saveAppointment').style.display = canEdit ? 'block' : 'none';
+    function getStatusClass(status) {
+        return {
+            'pending': 'warning',
+            'completed': 'success',
+            'cancelled': 'danger'
+        }[status] || 'secondary';
+    }
 
-                // Mostrar el modal
-                const modal = new bootstrap.Modal(modalEl);
-                modal.show();
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showToast(error.message, 'error');
-            });
+    function getStatusText(status) {
+        return {
+            'pending': 'Pendiente',
+            'completed': 'Completada',
+            'cancelled': 'Cancelada'
+        }[status] || status;
     }
 
     // Dashboard Data Management
@@ -776,33 +832,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Utility Functions
-    function formatDate(dateStr) {
-        return new Intl.DateTimeFormat('es', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        }).format(new Date(dateStr));
-    }
-
-    function getStatusClass(status) {
-        return {
-            'pending': 'warning',
-            'completed': 'success',
-            'cancelled': 'danger'
-        }[status] || 'secondary';
-    }
-
-    function getStatusText(status) {
-        return {
-            'pending': 'Pendiente',
-            'completed': 'Completada',
-            'cancelled': 'Cancelada'
-        }[status] || status;
-    }
-
-    // Upcoming Appointments
+    // CORRECCIÓN: Función mejorada para actualizar próximas citas
     function updateUpcomingAppointments(appointments) {
         const container = document.getElementById('upcomingAppointments');
         if (!container) return;
@@ -818,7 +848,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         container.innerHTML = appointments.map(apt => {
-            const canEdit = canEditAppointment(apt.staff_id);
+            const canEdit = canEditAppointment(parseInt(apt.staff_id));
             return `
                 <div class="appointment-card" ${canEdit ? `onclick="loadAppointment(${apt.id}, ${apt.staff_id})"` : ''} 
                      style="cursor: ${canEdit ? 'pointer' : 'default'}">
@@ -849,6 +879,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }).join('');
     }
 
+    // CORRECCIÓN: Hacer la función disponible globalmente
+    window.updateUpcomingAppointments = updateUpcomingAppointments;
+
     // Event Handlers
     if (viewSelector) {
         viewSelector.addEventListener('change', function() {
@@ -869,64 +902,6 @@ document.addEventListener('DOMContentLoaded', function() {
         loadDashboardData();
         calendar?.refetchEvents();
         showToast('Dashboard actualizado');
-    });
-
-    // Save appointment handler
-    document.getElementById('saveAppointment')?.addEventListener('click', async function() {
-        try {
-            const form = document.getElementById('appointmentForm');
-            if (!form.checkValidity()) {
-                form.reportValidity();
-                return;
-            }
-
-            const formData = new FormData(form);
-            const appointmentId = formData.get('appointment_id');
-            const date = formData.get('date');
-            const time = formData.get('time');
-
-            const data = {
-                visitor_name: formData.get('visitor_name'),
-                visitor_email: formData.get('visitor_email'),
-                visitor_phone: formData.get('visitor_phone'),
-                stage: formData.get('stage'),
-                date: `${date}T${time}`,
-                duration: parseInt(formData.get('duration')),
-                status: formData.get('status'),
-                comments: formData.get('comments'),
-                staff_id: formData.get('staff_id')
-            };
-
-            const response = await fetch(
-                appointmentId ? `${window.APPOINTMENTS_CONFIG.apiUrl}${appointmentId}/` : window.APPOINTMENTS_CONFIG.apiUrl,
-                {
-                    method: appointmentId ? 'PUT' : 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': window.APPOINTMENTS_CONFIG.csrfToken
-                    },
-                    body: JSON.stringify(data)
-                }
-            );
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Error al guardar la cita');
-            }
-
-            // Actualizar dashboard
-            loadDashboardData();
-            calendar?.refetchEvents();
-            
-            const modal = bootstrap.Modal.getInstance(document.getElementById('appointmentModal'));
-            modal.hide();
-            
-            showToast(appointmentId ? 'Cita actualizada correctamente' : 'Cita creada correctamente');
-
-        } catch (error) {
-            console.error('Error saving appointment:', error);
-            showToast(error.message, 'error');
-        }
     });
 
     // Initialize Dashboard

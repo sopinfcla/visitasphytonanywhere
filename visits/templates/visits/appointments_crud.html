@@ -10,6 +10,15 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 <!-- Toastify CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+<style>
+.modal-readonly .form-control,
+.modal-readonly .form-select,
+.modal-readonly .btn-save {
+    pointer-events: none;
+    background-color: #e9ecef;
+    opacity: 0.8;
+}
+</style>
 {% endblock %}
 
 {% block admin_content %}
@@ -25,7 +34,7 @@
                             <p class="text-muted mb-0">{{ staff_name }}</p>
                         </div>
                         <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#appointmentModal">
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#appointmentModal" onclick="prepareNewAppointment()">
                                 <i class="bi bi-plus-lg"></i> Nueva Cita
                             </button>
                             <button type="button" class="btn btn-outline-primary" id="exportPDF">
@@ -105,7 +114,7 @@
     </div>
 </div>
 
-<!-- Modal Form -->
+<!-- Modal Form Unificado -->
 <div class="modal fade" id="appointmentModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -116,6 +125,8 @@
             <div class="modal-body">
                 <form id="appointmentForm" novalidate>
                     <input type="hidden" id="appointment_id" name="appointment_id">
+                    <input type="hidden" id="appointment_staff_id" name="staff_id">
+                    <!-- Información del Visitante -->
                     <div class="mb-3">
                         <label for="visitor_name" class="form-label">Nombre del Visitante</label>
                         <input type="text" class="form-control" id="visitor_name" name="visitor_name" required>
@@ -130,6 +141,7 @@
                                maxlength="9" pattern="[0-9]{9}" 
                                oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 9)">
                     </div>
+                    <!-- Etapa y Curso -->
                     <div class="mb-3">
                         <label for="stage" class="form-label">Etapa</label>
                         <select class="form-select" id="stage" name="stage" required>
@@ -139,6 +151,13 @@
                             {% endfor %}
                         </select>
                     </div>
+                    <div class="mb-3" id="course-container" style="display: none;">
+                        <label for="course" class="form-label">Curso</label>
+                        <select class="form-select" id="course" name="course">
+                            <option value="">Seleccione primero una etapa</option>
+                        </select>
+                    </div>
+                    <!-- Fecha y Hora -->
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label for="date" class="form-label">Fecha</label>
@@ -163,6 +182,7 @@
                             </select>
                         </div>
                     </div>
+                    <!-- Estado -->
                     <div class="mb-3">
                         <label for="status" class="form-label">Estado</label>
                         <select class="form-select" id="status" name="status" required>
@@ -172,28 +192,31 @@
                             <option value="cancelled">Cancelada</option>
                         </select>
                     </div>
+                    <!-- Comentarios -->
                     <div class="mb-3">
                         <label for="comments" class="form-label">Comentarios</label>
                         <textarea class="form-control" id="comments" name="comments" rows="2"></textarea>
                     </div>
-                    <!-- Nuevos campos añadidos -->
-                    <div class="row">
-                        <div class="col-md-8 mb-3">
-                            <label for="notes" class="form-label">Notas del Profesor</label>
-                            <textarea class="form-control" id="notes" name="notes" rows="3" 
-                                      placeholder="Notas internas - no visibles para el visitante"></textarea>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label for="follow_up_date" class="form-label">Fecha de Seguimiento</label>
-                            <input type="date" class="form-control" id="follow_up_date" name="follow_up_date" 
-                                   min="{{ today }}">
+                    <!-- Campos adicionales (siempre visibles en CRUD) -->
+                    <div class="advanced-fields">
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label for="notes" class="form-label">Notas del Profesor</label>
+                                <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                          placeholder="Notas internas - no visibles para el visitante"></textarea>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="follow_up_date" class="form-label">Fecha de Seguimiento</label>
+                                <input type="date" class="form-control" id="follow_up_date" name="follow_up_date" 
+                                       min="{{ today }}">
+                            </div>
                         </div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="saveAppointment">Guardar</button>
+                <button type="button" class="btn btn-primary btn-save" id="saveAppointment">Guardar</button>
             </div>
         </div>
     </div>
@@ -226,8 +249,16 @@
     window.APPOINTMENTS_CONFIG = {
         apiUrl: '{% url "api_appointments" %}',
         csrfToken: '{{ csrf_token }}',
-        staffId: '{{ request.user.staffprofile.id }}'
+        staffId: '{{ request.user.staffprofile.id }}',
+        isAdvancedMode: true // Para mostrar campos adicionales
     };
+    
+    function prepareNewAppointment() {
+        // Mostrar campos avanzados en modo CRUD
+        document.querySelector('.advanced-fields').style.display = 'block';
+        // Limpiar formulario
+        cleanupModal();
+    }
 </script>
 
 <!-- Application Code -->

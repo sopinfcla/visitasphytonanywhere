@@ -1,12 +1,12 @@
 # ====================================
-# Part 1: Imports and Configuration
+# Part 1: Imports and Configuration - CORREGIDO
 # ====================================
 
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-from django.utils.timezone import make_aware
+from django.utils.timezone import make_aware, localtime, get_current_timezone
 from datetime import datetime, timedelta, time
 import calendar
 import logging
@@ -43,42 +43,80 @@ class StaffProfile(models.Model):
     notify_new_appointment = models.BooleanField(default=True)
     notify_reminder = models.BooleanField(default=True)
     
-    
-    
     def __str__(self):
         return self.user.get_full_name()
 
     def has_overlapping_slots(self, date, start_time, end_time, exclude_id=None):
-        logger.debug(f"El profesor {self} está comprobando solapamientos de slots en {date} para el intervalo {start_time} – {end_time}")
+        """
+        CORRECCIÓN COMPLETA: Verificar solapamientos de slots con manejo correcto de límites exactos
+        """
+        logger.debug(f"Verificando solapamientos de slots para {self} en {date} de {start_time} a {end_time}")
+        
         overlapping = AvailabilitySlot.objects.filter(
             staff=self,
             date=date,
             is_active=True
-        ).exclude(id=exclude_id)
+        )
+        
+        if exclude_id:
+            overlapping = overlapping.exclude(id=exclude_id)
         
         for slot in overlapping:
-            logger.debug(f"Comparando con el slot {slot} ({slot.start_time} – {slot.end_time})")
+            logger.debug(f"Comparando con slot existente: {slot.start_time} - {slot.end_time}")
+            
+            # CORRECCIÓN: Verificar solapamiento real (sin límites exactos)
+            # Hay solapamiento si: start1 < end2 AND end1 > start2
+            # PERO permitir límites exactos: end1 == start2 OR start1 == end2
             if start_time < slot.end_time and end_time > slot.start_time:
-                logger.info(f"Se encontró un slot solapado: {slot}")
+                # Permitir límites exactos
+                if end_time == slot.start_time or start_time == slot.end_time:
+                    logger.debug(f"Límite exacto permitido con slot {slot.id}")
+                    continue
+                
+                logger.warning(f"Slot solapado encontrado: {slot.id}")
                 return True
+        
+        logger.debug("No se encontraron solapamientos de slots")
         return False
 
     def has_appointments_in_timeframe(self, date, start_time, end_time):
-        logger.debug(f"El profesor {self} está comprobando citas en {date} para el intervalo {start_time} – {end_time}")
-        start_datetime = make_aware(datetime.combine(date, start_time))
-        end_datetime = make_aware(datetime.combine(date, end_time))
+        """
+        CORRECCIÓN COMPLETA: Verificar citas que se solapen con manejo correcto de zonas horarias
+        """
+        logger.debug(f"Verificando citas para {self} en {date} de {start_time} a {end_time}")
         
-        exists = Appointment.objects.filter(
+        # Buscar citas del mismo día
+        appointments_same_day = Appointment.objects.filter(
             staff=self,
-            date__gte=start_datetime,
-            date__lt=end_datetime
-        ).exists()
-        if exists:
-            logger.info(f"Se encontró una cita que se solapa en el intervalo {start_time} – {end_time} en {date}")
-        return exists
+            date__date=date
+        )
+        
+        logger.debug(f"Encontradas {appointments_same_day.count()} citas en {date}")
+        
+        for appointment in appointments_same_day:
+            # CORRECCIÓN: Convertir la cita a hora local para comparación
+            apt_local = localtime(appointment.date)
+            apt_start_time = apt_local.time()
+            apt_end_time = (apt_local + timedelta(minutes=appointment.duration)).time()
+            
+            logger.debug(f"Comparando con cita {appointment.id}: {apt_start_time} - {apt_end_time}")
+            
+            # CORRECCIÓN: Verificar solapamiento con times (no datetimes)
+            # Hay solapamiento si: start1 < end2 AND end1 > start2
+            if start_time < apt_end_time and end_time > apt_start_time:
+                # Permitir límites exactos
+                if end_time == apt_start_time or start_time == apt_end_time:
+                    logger.debug(f"Límite exacto permitido con cita {appointment.id}")
+                    continue
+                
+                logger.warning(f"Cita solapada encontrada: {appointment.id} ({apt_start_time} - {apt_end_time})")
+                return True
+        
+        logger.debug("No se encontraron solapamientos con citas")
+        return False
 
 # ====================================
-# Part 3: Appointment Management
+# Part 3: Appointment Management - CORREGIDO
 # ====================================
 
 class Appointment(models.Model):
@@ -117,41 +155,91 @@ class Appointment(models.Model):
         ]
     
     def clean(self):
-        logger.debug(f"Validando la cita para {self.visitor_name} programada para {self.date}")
+        """
+        CORRECCIÓN COMPLETA: Validar solapamientos con zona horaria correcta EN MENSAJES
+        """
+        super().clean()
         
-        # Si se especifica un curso, debe corresponder a la etapa seleccionada
+        logger.debug(f"Validando cita para {self.visitor_name} programada para {self.date}")
+        
+        # Validar que el curso corresponde a la etapa
         if self.course and self.stage and self.course.stage != self.stage:
             logger.warning(f"El curso {self.course} no pertenece a la etapa {self.stage}")
             raise ValidationError({
                 'course': _('El curso seleccionado no pertenece a la etapa elegida.')
             })
         
-        if not self.pk:
-            if self.staff and self.stage and self.stage not in self.staff.allowed_stages.all():
-                logger.warning(f"El profesor {self.staff} no está autorizado para atender la etapa {self.stage}")
-                raise ValidationError({
-                    'staff': _('Este miembro del staff no puede atender citas de esta etapa.')
-                })
+        # Validar que el staff puede atender la etapa
+        if self.staff and self.stage and self.stage not in self.staff.allowed_stages.all():
+            logger.warning(f"El profesor {self.staff} no está autorizado para atender la etapa {self.stage}")
+            raise ValidationError({
+                'staff': _('Este miembro del staff no puede atender citas de esta etapa.')
+            })
+        
+        # Validar formato del teléfono
+        if self.visitor_phone and (not self.visitor_phone.isdigit() or len(self.visitor_phone) != 9):
+            logger.warning(f"Formato de teléfono inválido: {self.visitor_phone}")
+            raise ValidationError({
+                'visitor_phone': _('El teléfono debe contener exactamente 9 dígitos.')
+            })
+        
+        # CORRECCIÓN PRINCIPAL: Validar solapamientos con zona horaria correcta
+        if self.date and self.staff and self.duration:
+            # Convertir a hora local para comparaciones Y mensajes
+            appointment_local = localtime(self.date)
+            appointment_date = appointment_local.date()
+            appointment_start_time = appointment_local.time()
+            appointment_end_time = (appointment_local + timedelta(minutes=self.duration)).time()
             
-            appointment_date = self.date.date()
-            appointment_time = self.date.time()
-            end_time = (datetime.combine(appointment_date, appointment_time) + timedelta(minutes=60)).time()
+            logger.debug(f"Validando cita: {appointment_date} {appointment_start_time} - {appointment_end_time}")
             
-            if self.staff.has_appointments_in_timeframe(appointment_date, appointment_time, end_time):
-                logger.warning("Se encontró una cita que se solapa en ese horario")
-                raise ValidationError(_('Ya existe una cita en este horario.'))
+            # Buscar citas existentes del mismo staff en el mismo día
+            existing_appointments = Appointment.objects.filter(
+                staff=self.staff,
+                date__date=appointment_date
+            )
             
-            if not self.visitor_phone.isdigit() or len(self.visitor_phone) != 9:
-                logger.warning(f"Formato de teléfono inválido: {self.visitor_phone}")
-                raise ValidationError({
-                    'visitor_phone': _('El teléfono debe contener exactamente 9 dígitos.')
-                })
+            # Excluir la cita actual si estamos editando
+            if self.pk:
+                existing_appointments = existing_appointments.exclude(pk=self.pk)
+                logger.debug(f"Excluyendo cita actual (ID: {self.pk}) de la validación")
             
-            logger.info(f"La cita para {self.visitor_name} a las {self.date} se validó correctamente")
+            logger.debug(f"Encontradas {existing_appointments.count()} citas existentes para validar")
+            
+            # Verificar solapamientos cita por cita
+            for existing_apt in existing_appointments:
+                # CORRECCIÓN: Convertir cita existente a hora local PARA COMPARACIÓN Y MENSAJE
+                existing_local = localtime(existing_apt.date)
+                existing_start_time = existing_local.time()
+                existing_end_time = (existing_local + timedelta(minutes=existing_apt.duration)).time()
+                
+                logger.debug(f"Comparando con cita {existing_apt.id}:")
+                logger.debug(f"  Existente: {existing_start_time} - {existing_end_time}")
+                logger.debug(f"  Nueva:     {appointment_start_time} - {appointment_end_time}")
+                
+                # CORRECCIÓN: Verificar solapamiento con times locales y permitir límites exactos
+                if appointment_start_time < existing_end_time and appointment_end_time > existing_start_time:
+                    # Permitir límites exactos
+                    if appointment_end_time == existing_start_time or appointment_start_time == existing_end_time:
+                        logger.debug(f"Límite exacto permitido con cita {existing_apt.id}")
+                        continue
+                    
+                    logger.warning("Cita solapada encontrada")
+                    
+                    # CORRECCIÓN: Mensaje con horas locales
+                    raise ValidationError(
+                        f'Ya existe una cita de {existing_apt.visitor_name} '
+                        f'programada de {existing_start_time.strftime("%H:%M")} a {existing_end_time.strftime("%H:%M")} '  
+                        f'el {existing_local.strftime("%d/%m/%Y")}'
+                    )
+                else:
+                    logger.debug(f"No hay solapamiento con cita {existing_apt.id}")
+        
+        logger.info(f"Cita para {self.visitor_name} validada correctamente")
     
     def save(self, *args, **kwargs):
         self.full_clean()
-        logger.debug(f"Guardando la cita para {self.visitor_name} a las {self.date}")
+        logger.debug(f"Guardando cita para {self.visitor_name} a las {self.date}")
         super().save(*args, **kwargs)
     
     def __str__(self):
@@ -159,7 +247,7 @@ class Appointment(models.Model):
         return f"{self.visitor_name} - {self.stage.name}{course_info} - {self.date}"
 
 # ====================================
-# Part 4: Availability Management
+# Part 4: Availability Management - CORREGIDO
 # ====================================
 
 class AvailabilitySlot(models.Model):
@@ -188,13 +276,31 @@ class AvailabilitySlot(models.Model):
         ]
     
     def clean(self):
-        logger.debug(f"Validando el slot para el profesor {self.staff} con tipo de repetición '{self.repeat_type}'")
+        """
+        CORRECCIÓN COMPLETA: Validación de slots con manejo correcto
+        """
+        logger.debug(f"Validando slot para {self.staff} con tipo '{self.repeat_type}'")
+        
+        # Validar horarios
         min_time = time(8, 0)
         max_time = time(20, 0)
         if self.start_time < min_time or self.end_time > max_time:
-            logger.warning("El horario del slot está fuera del rango permitido (8:00 - 20:00)")
+            logger.warning("Horario fuera del rango permitido (8:00 - 20:00)")
             raise ValidationError(_('Los horarios deben estar entre 8:00 y 20:00'))
         
+        if self.end_time <= self.start_time:
+            logger.warning("La hora de fin debe ser posterior a la hora de inicio")
+            raise ValidationError({'end_time': 'La hora de fin debe ser posterior a la hora de inicio'})
+        
+        if self.duration <= 0:
+            logger.warning("La duración debe ser un valor positivo")
+            raise ValidationError({'duration': 'La duración debe ser positiva'})
+        
+        if self.stage not in self.staff.allowed_stages.all():
+            logger.warning("El profesor no está autorizado para atender esta etapa")
+            raise ValidationError({'stage': 'Este miembro del staff no puede atender esta etapa'})
+        
+        # Validar según tipo de repetición
         if self.repeat_type == 'once':
             if not self.date:
                 logger.warning("Se requiere la fecha para un slot no recurrente")
@@ -204,6 +310,15 @@ class AvailabilitySlot(models.Model):
                 raise ValidationError({'date': 'No se pueden crear slots para fechas pasadas'})
             self.month = None
             self.weekday = None
+            
+            # CORRECCIÓN: Verificar solapamientos para slots no recurrentes
+            if self.staff.has_overlapping_slots(self.date, self.start_time, self.end_time, self.pk):
+                logger.warning("Slot solapado encontrado")
+                raise ValidationError(_('Ya existe un slot en este horario'))
+            if self.staff.has_appointments_in_timeframe(self.date, self.start_time, self.end_time):
+                logger.warning("Cita programada en el mismo intervalo")
+                raise ValidationError(_('Ya existe una cita programada en este horario'))
+                
         elif self.repeat_type == 'weekly':
             if self.month is None or self.weekday is None:
                 logger.warning("Se requieren mes y día de la semana para un slot semanal")
@@ -217,30 +332,11 @@ class AvailabilitySlot(models.Model):
                 raise ValidationError({'month': 'No se pueden crear slots para meses pasados'})
             self.date = None
         
-        if self.end_time <= self.start_time:
-            logger.warning("La hora de fin debe ser posterior a la hora de inicio")
-            raise ValidationError({'end_time': 'La hora de fin debe ser posterior a la hora de inicio'})
-        if self.duration <= 0:
-            logger.warning("La duración debe ser un valor positivo")
-            raise ValidationError({'duration': 'La duración debe ser positiva'})
-        if self.stage not in self.staff.allowed_stages.all():
-            logger.warning("El profesor no está autorizado para atender esta etapa")
-            raise ValidationError({'stage': 'Este miembro del staff no puede atender esta etapa'})
-        
-        # Verificar solapamientos para slots no recurrentes:
-        if self.repeat_type == 'once' and self.date:
-            if self.staff.has_overlapping_slots(self.date, self.start_time, self.end_time, self.pk):
-                logger.warning("Se encontró un slot solapado")
-                raise ValidationError(_('Ya existe un slot en este horario'))
-            if self.staff.has_appointments_in_timeframe(self.date, self.start_time, self.end_time):
-                logger.warning("Se encontró una cita programada en el mismo intervalo")
-                raise ValidationError(_('Ya existe una cita programada en este horario'))
-        
-        logger.info(f"El slot para el profesor {self.staff} se validó correctamente para {self.date or 'slot recurrente'}")
+        logger.info(f"Slot para {self.staff} validado correctamente")
     
     def save(self, *args, **kwargs):
         self.full_clean()
-        logger.debug(f"Guardando el slot para el profesor {self.staff} en {self.date or 'slot recurrente'}")
+        logger.debug(f"Guardando slot para {self.staff} en {self.date or 'slot recurrente'}")
         super().save(*args, **kwargs)
     
     def get_datetime_start(self):
@@ -254,39 +350,50 @@ class AvailabilitySlot(models.Model):
         return dt_end
     
     def is_available(self):
+        """
+        CORRECCIÓN COMPLETA: Verificar disponibilidad con manejo correcto
+        """
         logger.debug(f"Comprobando disponibilidad del slot en {self.date} de {self.start_time} a {self.end_time}")
         if not self.is_active:
             logger.debug("El slot no está activo")
             return False
         
-        available = not Appointment.objects.filter(
+        # Verificar si hay citas que se solapen con este slot
+        appointments = Appointment.objects.filter(
             stage=self.stage,
             staff=self.staff,
-            date__date=self.date,
-            date__time__range=(self.start_time, self.end_time)
-        ).exists()
+            date__date=self.date
+        )
         
-        if available:
-            logger.debug("El slot está disponible")
-        else:
-            logger.debug("El slot no está disponible debido a una cita existente")
-        return available
+        for apt in appointments:
+            apt_local = localtime(apt.date)
+            apt_start_time = apt_local.time()
+            apt_end_time = (apt_local + timedelta(minutes=apt.duration)).time()
+            
+            # Verificar solapamiento con límites exactos permitidos
+            if self.start_time < apt_end_time and self.end_time > apt_start_time:
+                # Permitir límites exactos
+                if self.end_time == apt_start_time or self.start_time == apt_end_time:
+                    continue
+                
+                logger.debug("El slot no está disponible debido a una cita existente")
+                return False
+        
+        logger.debug("El slot está disponible")
+        return True
 
     def generate_slots(self):
         """
-        Genera slots a partir de la disponibilidad base.
-        Para slots no recurrentes, genera slots en intervalos de 15 minutos.
-        Para slots recurrentes, genera slots para todas las ocurrencias del mes.
+        CORRECCIÓN COMPLETA: Genera slots con manejo correcto
         """
-        logger.info(f"Generando slots para el profesor {self.staff} con tipo de repetición '{self.repeat_type}'")
+        logger.info(f"Generando slots para {self.staff} con tipo '{self.repeat_type}'")
         if self.repeat_type == 'once':
             return self._generate_day_slots()
         return self._generate_monthly_slots()
 
     def _generate_day_slots(self):
         """
-        Genera slots individuales para un día específico con intervalos de 15 minutos
-        y asegurando que cada slot tenga espacio para la duración completa.
+        CORRECCIÓN COMPLETA: Genera slots individuales para un día específico
         """
         slots = []
         current_dt = datetime.combine(self.date, self.start_time)
@@ -303,7 +410,7 @@ class AvailabilitySlot(models.Model):
             slot_start = current_dt.time()
             slot_end = (current_dt + timedelta(minutes=self.duration)).time()
             
-            # Verificar si existe una cita programada en este intervalo
+            # CORRECCIÓN: Verificar si existe una cita programada en este intervalo
             if not self.staff.has_appointments_in_timeframe(self.date, slot_start, slot_end):
                 slot = AvailabilitySlot(
                     staff=self.staff,
@@ -316,7 +423,7 @@ class AvailabilitySlot(models.Model):
                     repeat_type='once'
                 )
                 slots.append(slot)
-                logger.debug(f"Slot generado: {slot_start} – {slot_end} para {self.date}")
+                logger.debug(f"Slot generado: {slot_start} - {slot_end} para {self.date}")
             
             # Avanzar 15 minutos
             current_dt += timedelta(minutes=15)
@@ -326,7 +433,7 @@ class AvailabilitySlot(models.Model):
 
     def _generate_monthly_slots(self):
         """
-        Genera slots para todas las ocurrencias del día de la semana especificado en el mes.
+        CORRECCIÓN COMPLETA: Genera slots para todas las ocurrencias del día de la semana
         """
         slots = []
         year = datetime.now().year
@@ -349,6 +456,7 @@ class AvailabilitySlot(models.Model):
                         slot_start = current_dt.time()
                         slot_end = (current_dt + timedelta(minutes=self.duration)).time()
                         
+                        # CORRECCIÓN: Verificación correcta de solapamientos
                         if not self.staff.has_appointments_in_timeframe(date_obj, slot_start, slot_end):
                             slot = AvailabilitySlot(
                                 staff=self.staff,
@@ -363,7 +471,7 @@ class AvailabilitySlot(models.Model):
                             slots.append(slot)
                         current_dt += timedelta(minutes=15)
         
-        logger.info(f"Generados {len(slots)} slots mensuales para el mes {self.month} en el día de la semana {self.weekday}")
+        logger.info(f"Generados {len(slots)} slots mensuales para el mes {self.month}")
         return slots
 
     def __str__(self):
@@ -375,7 +483,6 @@ class AvailabilitySlot(models.Model):
     def cleanup_old_slots(cls):
         """
         Elimina los slots de fechas pasadas que no tienen citas asignadas.
-        Se ejecuta automáticamente al iniciar la aplicación.
         """
         today = datetime.now().date()
         

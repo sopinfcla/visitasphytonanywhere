@@ -186,6 +186,8 @@
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('bookingForm');
     const phoneInput = document.getElementById('visitor_phone');
+    const submitButton = form.querySelector('button[type="submit"]');
+    let isSubmitting = false; // Flag para prevenir envíos múltiples
     
     // Validación del teléfono
     phoneInput.addEventListener('input', function(e) {
@@ -224,9 +226,16 @@ document.addEventListener('DOMContentLoaded', function() {
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
         
+        // CORRECCIÓN: Prevenir envíos múltiples
+        if (isSubmitting) {
+            console.log('Ya se está procesando la reserva...');
+            return;
+        }
+        
         // Validar teléfono antes de enviar
         if (phoneInput.value.length !== 9) {
             phoneInput.classList.add('is-invalid');
+            phoneInput.focus();
             return;
         }
         
@@ -240,8 +249,17 @@ document.addEventListener('DOMContentLoaded', function() {
             courseSelect.classList.remove('is-invalid');
         }
         
+        // CORRECCIÓN: Marcar como enviando y deshabilitar botón
+        isSubmitting = true;
+        const originalText = submitButton.innerHTML;
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Procesando...';
+        
         try {
-            const response = await fetch('', {
+            console.log('Enviando reserva...');
+            
+            // CORRECCIÓN: Usar window.location.href en lugar de URL vacía
+            const response = await fetch(window.location.href, {
                 method: 'POST',
                 body: new FormData(form),
                 headers: {
@@ -249,16 +267,61 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
-            const data = await response.json();
+            console.log('Respuesta recibida:', response.status);
             
             if (response.ok) {
-                window.location.href = data.redirect_url;
+                const data = await response.json();
+                console.log('Datos de respuesta:', data);
+                
+                if (data.status === 'success' && data.redirect_url) {
+                    console.log('Redirigiendo a:', data.redirect_url);
+                    // CORRECCIÓN: Redirigir inmediatamente sin esperar
+                    window.location.replace(data.redirect_url);
+                } else {
+                    throw new Error(data.error || 'Respuesta inesperada del servidor');
+                }
             } else {
-                alert(data.error || 'Error al procesar la reserva');
+                const errorData = await response.json().catch(() => ({ error: 'Error del servidor' }));
+                throw new Error(errorData.error || `Error ${response.status}`);
             }
+            
         } catch (error) {
-            console.error('Error:', error);
-            alert('Error al procesar la reserva');
+            console.error('Error procesando la reserva:', error);
+            
+            // CORRECCIÓN: Mostrar error más amigable
+            const errorMessage = error.message || 'Error al procesar la reserva. Por favor, inténtalo de nuevo.';
+            
+            // Crear un alert más elegante
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-danger alert-dismissible fade show mt-3';
+            alertDiv.innerHTML = `
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                ${errorMessage}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            // Insertar el alert antes del formulario
+            form.parentNode.insertBefore(alertDiv, form);
+            
+            // Auto-ocultar después de 5 segundos
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 5000);
+            
+        } finally {
+            // CORRECCIÓN: Restaurar botón siempre
+            isSubmitting = false;
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalText;
+        }
+    });
+    
+    // CORRECCIÓN: Prevenir el envío normal del form por si acaso
+    form.addEventListener('submit', function(e) {
+        if (isSubmitting) {
+            e.preventDefault();
         }
     });
 });

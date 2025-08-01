@@ -1,5 +1,5 @@
 # ====================================
-# Part 1: Imports and Base Functions
+# Part 1: Imports and Base Functions - CORREGIDO
 # ====================================
 
 # Importaciones de Django
@@ -13,12 +13,11 @@ from django.http import JsonResponse
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.utils.timezone import make_aware, get_current_timezone
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.db.models.functions import ExtractHour
 from django.utils.timezone import is_naive, make_aware, localtime
 from django.middleware.csrf import get_token
 from django.db import transaction
-
 
 # Importaciones de Python
 from datetime import datetime, timedelta, time
@@ -35,22 +34,14 @@ from .forms import StaffAuthenticationForm
 from .emails import send_appointment_confirmation
 
 # ====================================
-# Part 1.1: Base Functions
+# Part 1.1: Base Functions - CORREGIDO
 # ====================================
 
 def is_slot_available(staff, datetime_start, duration):
     """
-    Comprueba si un slot de tiempo está disponible para un miembro del staff
-    
-    Args:
-        staff (StaffProfile): Perfil del staff a comprobar
-        datetime_start (datetime): Fecha y hora de inicio
-        duration (int): Duración en minutos
-        
-    Returns:
-        bool: True si el slot está disponible, False si no
+    CORRECCIÓN COMPLETA: Comprueba si un slot de tiempo está disponible
     """
-    logger.debug(f"Comprobando disponibilidad del slot para el profesor {staff} a partir de {datetime_start} durante {duration} minutos")
+    logger.debug(f"Comprobando disponibilidad para {staff} a partir de {datetime_start} durante {duration} minutos")
     datetime_end = datetime_start + timedelta(minutes=duration)
     
     # Obtener citas del mismo día
@@ -59,12 +50,17 @@ def is_slot_available(staff, datetime_start, duration):
         date__date=datetime_start.date()
     )
     
-    # Verificar solapamiento cita por cita
+    # CORRECCIÓN: Verificar solapamiento con límites exactos permitidos
     for existing_apt in existing_appointments:
         existing_end = existing_apt.date + timedelta(minutes=existing_apt.duration)
-        # Hay solapamiento si: existing_start < new_end AND existing_end > new_start
+        
+        # Hay solapamiento si hay intersección real (no en límites exactos)
         if existing_apt.date < datetime_end and existing_end > datetime_start:
-            logger.info(f"Se encontró una cita solapada para el profesor {staff}")
+            # PERMITIR límites exactos: cita termina cuando empieza nueva o viceversa
+            if existing_end == datetime_start or existing_apt.date == datetime_end:
+                continue  # No es solapamiento, es límite exacto permitido
+            
+            logger.info(f"Cita solapada encontrada: {existing_apt.visitor_name} ({existing_apt.date} - {existing_end})")
             return False
 
     return True
@@ -74,10 +70,7 @@ def is_slot_available(staff, datetime_start, duration):
 # ====================================
 
 class StaffLoginView(LoginView):
-    """
-    Vista personalizada para el login del staff que usa un formulario personalizado
-    y maneja la funcionalidad de remember_me
-    """
+    """Vista personalizada para el login del staff"""
     form_class = StaffAuthenticationForm
     template_name = 'visits/login.html'
     redirect_authenticated_user = True
@@ -303,7 +296,7 @@ def get_stage_availability(request, stage_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 # ====================================
-# Part 4: Booking Management
+# Part 4: Booking Management - CORREGIDO
 # ====================================
 
 def book_appointment(request, stage_id, slot_id):
@@ -330,12 +323,15 @@ def book_appointment(request, stage_id, slot_id):
                     date__date=appointment_datetime.date()
                 )
                 
-                # Verificar solapamiento cita por cita
+                # Verificar solapamiento cita por cita con límites exactos permitidos
                 has_overlap = False
                 for existing_apt in existing_appointments:
                     existing_end = existing_apt.date + timedelta(minutes=existing_apt.duration)
                     # Hay solapamiento si: existing_start < new_end AND existing_end > new_start
                     if existing_apt.date < appointment_end and existing_end > appointment_datetime:
+                        # CORRECCIÓN: Permitir límites exactos
+                        if existing_end == appointment_datetime or existing_apt.date == appointment_end:
+                            continue  # No es solapamiento, es límite exacto
                         has_overlap = True
                         break
                 
@@ -403,7 +399,7 @@ def book_appointment(request, stage_id, slot_id):
                     'status': 'success',
                     'appointment_id': appointment.id,
                     'redirect_url': reverse('appointment_confirmation', 
-                                         kwargs={'appointment_id': appointment.id})
+                                        kwargs={'appointment_id': appointment.id})
                 })
                 
         except Exception as e:
@@ -420,7 +416,7 @@ def book_appointment(request, stage_id, slot_id):
     return render(request, 'visits/book_appointment.html', context)
 
 # ====================================
-# Part 5: Staff Availability
+# Part 5: Staff Availability - CORREGIDO
 # ====================================
 
 class StaffAvailabilityView(LoginRequiredMixin, View):
@@ -475,7 +471,7 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
                 'is_active': True
             }
 
-            # Verificación de solapamientos según el tipo de slot
+            # CORRECCIÓN: Verificación de solapamientos según el tipo de slot
             if base_slot_data['repeat_type'] == 'weekly':
                 base_slot_data.update({
                     'month': int(request.POST.get('month')),
@@ -496,35 +492,19 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
                 
                 # Verificar solapamientos para todas las fechas
                 for date_to_check in month_dates:
-                    # Verificar solapamiento con otros slots
-                    overlapping_slots = AvailabilitySlot.objects.filter(
-                        staff=staff_profile,
-                        date=date_to_check,
-                        is_active=True
-                    ).filter(
-                        Q(start_time__lt=end_time) & Q(end_time__gt=start_time)
-                    ).exists()
-
-                    if overlapping_slots:
+                    if date_to_check < datetime.now().date():
+                        continue
+                        
+                    # CORRECCIÓN: Verificar solapamiento con otros slots
+                    if staff_profile.has_overlapping_slots(date_to_check, start_time, end_time):
                         return JsonResponse({
-                            'error': 'Ya existen slots de disponibilidad que se solapan con este horario'
+                            'error': f'Ya existen slots de disponibilidad que se solapan en {date_to_check.strftime("%d/%m/%Y")}'
                         }, status=400)
 
-                    # Verificar solapamiento con citas
-                    start_datetime = datetime.combine(date_to_check, start_time)
-                    end_datetime = datetime.combine(date_to_check, end_time)
-                    
-                    overlapping_appointments = Appointment.objects.filter(
-                        staff=staff_profile,
-                        date__range=(
-                            make_aware(start_datetime),
-                            make_aware(end_datetime)
-                        )
-                    ).exists()
-
-                    if overlapping_appointments:
+                    # CORRECCIÓN: Verificar solapamiento con citas
+                    if staff_profile.has_appointments_in_timeframe(date_to_check, start_time, end_time):
                         return JsonResponse({
-                            'error': 'Hay citas programadas que se solapan con este horario'
+                            'error': f'Hay una cita programada que se solapa en {date_to_check.strftime("%d/%m/%Y")}'
                         }, status=400)
                     
             else:
@@ -535,34 +515,15 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
                     return JsonResponse({'error': 'No se pueden crear slots para fechas pasadas'}, status=400)
                 base_slot_data['date'] = date_obj
 
-                # Verificaciones para slots únicos
-                overlapping_slots = AvailabilitySlot.objects.filter(
-                    staff=staff_profile,
-                    date=date_obj,
-                    is_active=True
-                ).filter(
-                    Q(start_time__lt=end_time) & Q(end_time__gt=start_time)
-                ).exists()
-
-                if overlapping_slots:
+                # CORRECCIÓN: Verificaciones para slots únicos
+                if staff_profile.has_overlapping_slots(date_obj, start_time, end_time):
                     return JsonResponse({
                         'error': 'Ya existen slots de disponibilidad que se solapan con este horario'
                     }, status=400)
 
-                start_datetime = datetime.combine(date_obj, start_time)
-                end_datetime = datetime.combine(date_obj, end_time)
-                
-                overlapping_appointments = Appointment.objects.filter(
-                    staff=staff_profile,
-                    date__range=(
-                        make_aware(start_datetime),
-                        make_aware(end_datetime)
-                    )
-                ).exists()
-
-                if overlapping_appointments:
+                if staff_profile.has_appointments_in_timeframe(date_obj, start_time, end_time):
                     return JsonResponse({
-                        'error': 'Hay citas programadas que se solapan con este horario'
+                        'error': 'Hay una cita programada que se solapa con este horario'
                     }, status=400)
 
             # Crear slots si no hay solapamientos
@@ -629,7 +590,7 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
             return JsonResponse({'error': str(e)}, status=500)
         
 # ====================================
-# Part 6: Appointments CRUD & Basic Views
+# Part 6: Appointments CRUD & Basic Views - CORREGIDO
 # ====================================
 
 class AppointmentsCRUDView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
@@ -783,11 +744,13 @@ class AppointmentAPIView(LoginRequiredMixin, View):
 
     def post(self, request):
         try:
+            logger.debug("=== APPOINTMENT CREATION START ===")
+            
             # 1. Preparar los datos
             data = json.loads(request.body)
-            logger.debug(f"Received POST data: {data}")
+            logger.debug(f"Parsed data: {data}")
 
-            # 2. Asignar staff_id (antes de la validación)
+            # 2. Asignar staff_id
             is_supervisor = request.user.groups.filter(name='Supervisor').exists()
             if not is_supervisor:
                 data['staff'] = request.user.staffprofile.id
@@ -800,33 +763,73 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                 date_str = data.get('date', '')
                 appointment_date = make_aware(datetime.fromisoformat(date_str))
                 data['date'] = appointment_date
+                logger.debug(f"Processed appointment date: {appointment_date}")
             except ValueError as e:
                 logger.error(f"Error parsing date: {str(e)}")
                 return JsonResponse({'error': 'Formato de fecha inválido'}, status=400)
 
-            # 4. Verificar solapamientos - CORRECCIÓN
+            # 4. CORRECCIÓN: Verificar solapamientos con lógica correcta Y MENSAJE CORRECTO
             staff_id = data['staff']
             duration = data.get('duration', 60)
             appointment_end = appointment_date + timedelta(minutes=duration)
-            
+
+            logger.debug(f"=== DEBUGGING OVERLAP CHECK ===")
+            logger.debug(f"New appointment: {appointment_date} to {appointment_end}")
+            logger.debug(f"Staff ID: {staff_id}, Duration: {duration}")
+
             # Obtener citas del mismo día y staff
             existing_appointments = Appointment.objects.filter(
                 staff_id=staff_id,
                 date__date=appointment_date.date()
             )
-            
-            # Verificar solapamiento
+
+            logger.debug(f"Found {existing_appointments.count()} existing appointments on {appointment_date.date()}")
+
+            # CORRECCIÓN: Verificar solapamiento con límites exactos permitidos
             overlap = False
+            overlap_details = []
+
             for existing_apt in existing_appointments:
                 existing_end = existing_apt.date + timedelta(minutes=existing_apt.duration)
+                
+                logger.debug(f"Checking existing appointment {existing_apt.id}:")
+                logger.debug(f"  Existing: {existing_apt.date} to {existing_end}")
+                logger.debug(f"  New:      {appointment_date} to {appointment_end}")
+                
+                # Hay solapamiento si hay intersección real (no en límites exactos)
                 if existing_apt.date < appointment_end and existing_end > appointment_date:
+                    # CORRECCIÓN: Permitir límites exactos
+                    if existing_end == appointment_date or existing_apt.date == appointment_end:
+                        logger.debug(f"  Límite exacto permitido con appointment {existing_apt.id}")
+                        continue  # No es solapamiento, es límite exacto
+                    
+                    # Hay solapamiento real
                     overlap = True
+                    
+                    # CORRECCIÓN: Convertir a hora local para el mensaje
+                    existing_local = localtime(existing_apt.date)
+                    existing_end_local = existing_local + timedelta(minutes=existing_apt.duration)
+                    
+                    overlap_details.append({
+                        'existing_id': existing_apt.id,
+                        'existing_start': existing_local,  # Hora local
+                        'existing_end': existing_end_local,  # Hora local
+                        'existing_visitor': existing_apt.visitor_name
+                    })
+                    logger.warning(f"OVERLAP DETECTED with appointment {existing_apt.id}")
                     break
+                else:
+                    logger.debug(f"  No overlap with appointment {existing_apt.id}")
+
+            logger.debug(f"Final overlap result: {overlap}")
 
             if overlap:
-                return JsonResponse({
-                    'error': 'Ya existe una cita en este horario'
-                }, status=400)
+                # CORRECCIÓN: Mensaje con horas locales
+                error_msg = f'Ya existe una cita en este horario. Conflicto con cita de {overlap_details[0]["existing_visitor"]} de {overlap_details[0]["existing_start"].strftime("%H:%M")} a {overlap_details[0]["existing_end"].strftime("%H:%M")}'
+                logger.error(f"Overlap error: {error_msg}")
+                return JsonResponse({'error': error_msg}, status=400)
+
+            logger.debug("No overlaps detected, proceeding with appointment creation")
 
             # 5. Crear la cita
             serializer = AppointmentSerializer(data=data)
@@ -836,13 +839,13 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                 
                 # 6. Eliminar slots solapados
                 appointment_end = appointment.date + timedelta(minutes=appointment.duration)
-                AvailabilitySlot.objects.filter(
+                deleted_slots = AvailabilitySlot.objects.filter(
                     staff_id=staff_id,
                     date=appointment.date.date(),
                     start_time__lt=appointment_end.time(),
                     end_time__gt=appointment.date.time()
                 ).delete()
-                logger.info(f"Deleted overlapping slots for appointment: {appointment.id}")
+                logger.info(f"Deleted {deleted_slots[0]} overlapping slots for appointment: {appointment.id}")
                 
                 response_data = serializer.data
                 response_data['duration'] = appointment.duration
@@ -860,6 +863,8 @@ class AppointmentAPIView(LoginRequiredMixin, View):
 
     def put(self, request, appointment_id):
         try:
+            logger.debug(f"=== APPOINTMENT UPDATE START for ID {appointment_id} ===")
+            
             is_supervisor = request.user.groups.filter(name='Supervisor').exists()
             
             # Permitir que los supervisores editen cualquier cita
@@ -883,6 +888,7 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                 try:
                     appointment_date = make_aware(datetime.fromisoformat(data['date']))
                     data['date'] = appointment_date
+                    logger.debug(f"Processed updated appointment date: {appointment_date}")
                 except ValueError as e:
                     logger.error(f"Error parsing date: {str(e)}")
                     return JsonResponse({'error': 'Formato de fecha inválido'}, status=400)
@@ -893,11 +899,15 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                 if not isinstance(duration, int) or duration not in [15, 30, 45, 60]:
                     return JsonResponse({'error': 'Duración inválida'}, status=400)
 
-            # Verificar solapamientos si la fecha cambia - CORRECCIÓN
+            # CORRECCIÓN: Verificar solapamientos si la fecha cambia CON MENSAJE CORRECTO
             if 'date' in data:
                 staff_id = data.get('staff', appointment.staff_id)
                 duration = data.get('duration', appointment.duration)
                 appointment_end = data['date'] + timedelta(minutes=duration)
+                
+                logger.debug(f"=== DEBUGGING UPDATE OVERLAP CHECK ===")
+                logger.debug(f"Updated appointment: {data['date']} to {appointment_end}")
+                logger.debug(f"Staff ID: {staff_id}, Duration: {duration}")
                 
                 # Obtener citas del mismo día y staff (excluyendo la actual)
                 existing_appointments = Appointment.objects.filter(
@@ -905,33 +915,69 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                     date__date=data['date'].date()
                 ).exclude(id=appointment_id)
                 
-                # Verificar solapamiento
+                logger.debug(f"Found {existing_appointments.count()} existing appointments on {data['date'].date()} (excluding current)")
+                
+                # CORRECCIÓN: Verificar solapamiento con límites exactos permitidos
                 overlap = False
+                overlap_details = []
+                
                 for existing_apt in existing_appointments:
                     existing_end = existing_apt.date + timedelta(minutes=existing_apt.duration)
+                    
+                    logger.debug(f"Checking existing appointment {existing_apt.id}:")
+                    logger.debug(f"  Existing: {existing_apt.date} to {existing_end}")
+                    logger.debug(f"  Updated:  {data['date']} to {appointment_end}")
+                    
+                    # Hay solapamiento si hay intersección real (no en límites exactos)
                     if existing_apt.date < appointment_end and existing_end > data['date']:
+                        # CORRECCIÓN: Permitir límites exactos
+                        if existing_end == data['date'] or existing_apt.date == appointment_end:
+                            logger.debug(f"  Límite exacto permitido con appointment {existing_apt.id}")
+                            continue  # No es solapamiento, es límite exacto
+                        
+                        # Hay solapamiento real
                         overlap = True
+                        
+                        # CORRECCIÓN: Convertir a hora local para el mensaje
+                        existing_local = localtime(existing_apt.date)
+                        existing_end_local = existing_local + timedelta(minutes=existing_apt.duration)
+                        
+                        overlap_details.append({
+                            'existing_id': existing_apt.id,
+                            'existing_start': existing_local,  # Hora local
+                            'existing_end': existing_end_local,  # Hora local
+                            'existing_visitor': existing_apt.visitor_name
+                        })
+                        logger.warning(f"OVERLAP DETECTED with appointment {existing_apt.id}")
                         break
+                    else:
+                        logger.debug(f"  No overlap with appointment {existing_apt.id}")
+
+                logger.debug(f"Final update overlap result: {overlap}")
 
                 if overlap:
-                    return JsonResponse({
-                        'error': 'Ya existe una cita en este horario'
-                    }, status=400)
+                    # CORRECCIÓN: Mensaje con horas locales
+                    error_msg = f'Ya existe una cita en este horario. Conflicto con cita de {overlap_details[0]["existing_visitor"]} de {overlap_details[0]["existing_start"].strftime("%H:%M")} a {overlap_details[0]["existing_end"].strftime("%H:%M")}'
+                    logger.error(f"Update overlap error: {error_msg}")
+                    return JsonResponse({'error': error_msg}, status=400)
+                
+                logger.debug("No overlaps detected, proceeding with appointment update")
 
             serializer = AppointmentSerializer(appointment, data=data, partial=True)
             if serializer.is_valid():
                 updated_appointment = serializer.save()
                 logger.info(f"Updated appointment: {appointment_id}")
                 
-                # Eliminar slots solapados
-                appointment_end = updated_appointment.date + timedelta(minutes=updated_appointment.duration)
-                AvailabilitySlot.objects.filter(
-                    staff_id=staff_id,
-                    date=updated_appointment.date.date(),
-                    start_time__lt=appointment_end.time(),
-                    end_time__gt=updated_appointment.date.time()
-                ).delete()
-                logger.info(f"Deleted overlapping slots for updated appointment: {appointment_id}")
+                # Eliminar slots solapados si cambió la fecha
+                if 'date' in data:
+                    appointment_end = updated_appointment.date + timedelta(minutes=updated_appointment.duration)
+                    deleted_slots = AvailabilitySlot.objects.filter(
+                        staff_id=staff_id,
+                        date=updated_appointment.date.date(),
+                        start_time__lt=appointment_end.time(),
+                        end_time__gt=updated_appointment.date.time()
+                    ).delete()
+                    logger.info(f"Deleted {deleted_slots[0]} overlapping slots for updated appointment: {appointment_id}")
                 
                 response_data = serializer.data
                 response_data['duration'] = updated_appointment.duration
@@ -989,32 +1035,10 @@ class AppointmentConfirmationView(TemplateView):
             'course_name': appointment.course.name if appointment.course else None,
             'date': appointment.date.strftime('%d/%m/%Y'),
             'time': appointment.date.strftime('%H:%M'),
-            'duration': appointment.duration  # Duración dinámica del slot
+            'duration': appointment.duration
         })
         return context
     
-# ====================================
-# Part 7: Dashboard Views
-# ====================================
-
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views.generic import TemplateView, View
-from django.http import JsonResponse
-from django.db.models import Count
-from datetime import datetime, timedelta
-import logging
-
-logger = logging.getLogger(__name__)
-
-from django.utils.timezone import is_naive, make_aware, localtime
-from django.http import JsonResponse
-from django.views import View
-from django.contrib.auth.mixins import LoginRequiredMixin
-from datetime import datetime, timedelta
-import logging
-from .models import Appointment
-
-
 # ====================================
 # Part 7: Dashboard Views
 # ====================================
@@ -1204,7 +1228,7 @@ class DashboardStatsView(LoginRequiredMixin, View):
                     date__gte=today_start
                 ).count(),
                 
-                'stages_count': staff_profile.allowed_stages.count()
+                'stages_count': staff_profile.allowed_stages.count() if not is_supervisor else SchoolStage.objects.count()
             }
 
             # Estadísticas por etapa 
@@ -1255,7 +1279,8 @@ class DashboardStatsView(LoginRequiredMixin, View):
                         'date': timezone.localtime(apt.date).isoformat(),
                         'time': timezone.localtime(apt.date).strftime('%H:%M'),
                         'status': apt.status,
-                        'staff_name': apt.staff.user.get_full_name()
+                        'staff_name': apt.staff.user.get_full_name(),
+                        'staff_id': apt.staff.id
                     } for apt in upcoming
                 ],
                 **stats
