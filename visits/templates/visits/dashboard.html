@@ -43,7 +43,7 @@
     border-radius: 12px;
 }
 
-/* Calendar Container & Events */
+/* --- ESTILOS DE CALENDARIO MEJORADOS --- */
 .calendar-container {
     background: white;
     border-radius: 12px;
@@ -62,88 +62,117 @@
     background-color: var(--primary-color);
     border-color: var(--primary-color);
 }
+.fc .fc-button-primary:hover, .fc .fc-button-primary:active {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+}
 
-/* CORRECCIÓN: Estilos mejorados para eventos del calendario */
-.fc .fc-event {
-    border-radius: 6px !important;
-    padding: 3px 6px !important;
+/* Estilo base para todos los eventos */
+.fc-event {
     cursor: pointer !important;
-    border: 2px solid !important;
-    font-size: 0.875rem !important;
-    max-height: none !important;
-    overflow: visible !important;
-    transition: all 0.2s ease !important;
+    border: none !important;
+    background-color: transparent !important; /* El fondo lo da el contenedor interno */
+    padding: 1px !important; /* Pequeño espacio para el hover */
 }
 
-.fc .fc-event-main {
-    padding: 4px 6px !important;
-    font-weight: 500 !important;
-    color: inherit !important;
+/* Contenedor personalizado para el contenido del evento */
+.custom-event-container {
+    padding: 6px 8px;
+    border-radius: 6px;
+    height: 100%;
+    color: white;
+    transition: all 0.2s ease-in-out;
+    border-left: 4px solid rgba(0,0,0,0.3);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
-.fc .fc-event:hover {
-    transform: scale(1.02) !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
-    transition: transform 0.2s ease !important;
+/* Colores de eventos basados en estado (clases asignadas por JS) */
+.event-status-completed .custom-event-container {
+    background: linear-gradient(135deg, rgba(25, 135, 84, 0.85), rgba(25, 135, 84, 1));
+    border-left-color: #0f5132;
+}
+.event-status-pending .custom-event-container {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.85), rgba(255, 193, 7, 1));
+    border-left-color: #cca005;
+    color: #212529; /* Texto oscuro para fondo amarillo */
+}
+.event-status-cancelled .custom-event-container {
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.85), rgba(220, 53, 69, 1));
+    border-left-color: #842029;
 }
 
-/* CORRECCIÓN CRÍTICA: Estados específicos del calendario */
-.fc .fc-event[style*="#ffc107"] {
-    background-color: #ffc107 !important;
-    border-color: #ffb000 !important;
-    color: #000 !important;
+/* Efecto hover sutil y moderno */
+.fc-event:hover .custom-event-container {
+    transform: scale(1.03);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.25);
+    filter: brightness(1.1);
 }
 
-.fc .fc-event[style*="#ffc107"] .fc-event-main {
-    color: #000 !important;
+/* Tipografía y layout del contenido del evento */
+.event-title {
+    font-weight: 600;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
-.fc .fc-event[style*="#198754"] {
-    background-color: #198754 !important;
-    border-color: #157347 !important;
-    color: white !important;
+/* Contenedor para los detalles compactos */
+.event-details-compact {
+    font-size: 0.75rem;
+    opacity: 0.95;
+    margin-top: 4px;
 }
 
-.fc .fc-event[style*="#198754"] .fc-event-main {
-    color: white !important;
+/* Insignia para la etapa, dentro del evento */
+.event-stage-badge-inner {
+    display: inline-block;
+    padding: 2px 6px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 500;
+    margin-bottom: 4px;
 }
 
-.fc .fc-event[style*="#dc3545"] {
-    background-color: #dc3545 !important;
-    border-color: #b02a37 !important;
-    color: white !important;
+/* Contenedor para el nombre del staff */
+.event-staff-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.event-staff-name i {
+    width: 12px;
+    text-align: center;
 }
 
-.fc .fc-event[style*="#dc3545"] .fc-event-main {
-    color: white !important;
+/* Ocultar detalles en la vista de mes para no saturar */
+.fc-daygrid-event .event-details-compact {
+    display: none;
 }
 
-/* Asegurar que el texto sea visible */
-.fc-event-title {
-    white-space: normal !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    font-weight: bold !important;
+/* Mostrar detalles en el popover de "ver más" de la vista de mes */
+.fc-popover .event-details-compact {
+    display: block;
 }
 
+/* Estilo de la hora del evento */
 .fc-event-time {
-    font-size: 0.8em !important;
-    opacity: 0.9 !important;
-    font-weight: normal !important;
+    font-weight: 700 !important;
+    font-size: 0.8rem !important;
 }
+/* --- FIN ESTILOS DE CALENDARIO --- */
 
-.event-stage-badge {
-    display: inline-block !important;
-    font-size: 0.7rem !important;
-    padding: 2px 6px !important;
-    margin-top: 2px !important;
-    background: rgba(255,255,255,0.3) !important;
-    border-radius: 10px !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    max-width: 100% !important;
-}
 
 /* Upcoming Appointments */
 .upcoming-appointments-wrapper {
@@ -542,7 +571,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let calendar, stagesChart, hoursChart;
     let currentView = '';
     
-    // Función para mostrar notificaciones
     function showToast(message, type = 'info') {
         Toastify({
             text: message,
@@ -554,13 +582,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }).showToast();
     }
 
-    // Verificar permisos de edición
     function canEditAppointment(appointmentStaffId) {
         const currentUserId = parseInt(window.APPOINTMENTS_CONFIG.staffId);
         return window.APPOINTMENTS_CONFIG.isStaff || appointmentStaffId === currentUserId;
     }
 
-    // Initialize view selector
     const viewSelector = document.getElementById('viewSelector');
     if (viewSelector) {
         const savedView = localStorage.getItem('dashboardView');
@@ -571,7 +597,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Calendar Configuration
     const calendarEl = document.getElementById('calendar');
     if (calendarEl) {
         calendar = new FullCalendar.Calendar(calendarEl, {
@@ -598,12 +623,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 startTime: '08:00',
                 endTime: '20:00',
             },
-            events: function(info, successCallback, failureCallback) {
+            events: function(fetchInfo, successCallback, failureCallback) {
                 const params = new URLSearchParams({
-                    start: info.startStr,
-                    end: info.endStr
+                    start: fetchInfo.startStr,
+                    end: fetchInfo.endStr
                 });
-
                 if (currentView) {
                     params.append('staff_id', currentView);
                 }
@@ -613,7 +637,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (!response.ok) throw new Error('Error en la respuesta del servidor');
                         return response.json();
                     })
-                    .then(data => successCallback(data))
+                    .then(data => {
+                        const events = data.map(event => {
+                            event.className = `event-status-${event.extendedProps.status || 'default'}`;
+                            return event;
+                        });
+                        successCallback(events);
+                    })
                     .catch(error => {
                         console.error('Error cargando eventos:', error);
                         failureCallback(error);
@@ -631,23 +661,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 loadAppointment(appointmentId, staffId);
             },
+            // MODIFICADO: Renderizado del contenido del evento para un estilo más compacto
             eventContent: function(arg) {
                 const props = arg.event.extendedProps;
-                const isMonthView = arg.view.type === 'dayGridMonth';
-                
+                const isPending = props.status === 'pending';
+                const textColorClass = isPending ? 'text-dark' : '';
+
                 return {
                     html: `
-                        <div class="fc-content">
-                            <div class="d-flex flex-column">
-                                <div class="fw-bold text-truncate">${props.visitor_name}</div>
-                                <div class="event-stage-badge">${props.stage}</div>
-                                <div class="small text-muted mt-1 ${isMonthView ? 'text-truncate' : ''}">
-                                    ${props.staff_name}
-                                </div>
-                                <div class="small">
-                                    <span class="badge bg-${getStatusClass(props.status)}">
-                                        ${getStatusText(props.status)}
-                                    </span>
+                        <div class="custom-event-container">
+                            <div class="event-title ${textColorClass}">
+                                <i class="fas fa-user-circle"></i>
+                                <span>${props.visitor_name}</span>
+                            </div>
+                            <div class="event-details-compact">
+                                <span class="event-stage-badge-inner">${props.stage}</span>
+                                <div class="event-staff-name ${textColorClass}">
+                                    <i class="fas fa-user-tie"></i>
+                                    <span>${props.staff_name}</span>
                                 </div>
                             </div>
                         </div>
@@ -657,12 +688,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         calendar.render();
-        
-        // CORRECCIÓN: Hacer el calendario disponible globalmente
         window.calendar = calendar;
     }
 
-    // Utility Functions
     function formatDate(dateStr) {
         return new Intl.DateTimeFormat('es', {
             weekday: 'long',
@@ -688,7 +716,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }[status] || status;
     }
 
-    // Dashboard Data Management
     async function loadDashboardData() {
         try {
             const params = new URLSearchParams();
@@ -703,13 +730,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const data = await response.json();
             
-            // Update stats
             updateStats(data);
-            
-            // Update charts
             updateCharts(data);
-            
-            // Update upcoming appointments
             updateUpcomingAppointments(data.upcoming_appointments);
             
         } catch (error) {
@@ -719,17 +741,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateStats(data) {
-        const stats = {
-            'todayCount': data.today_count || '-',
-            'confirmedCount': data.confirmed_count || '-',
-            'pendingCount': data.pending_count || '-',
-            'stagesCount': data.stages_count || '-'
-        };
-        
-        Object.entries(stats).forEach(([id, value]) => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = value;
-        });
+        document.getElementById('todayCount').textContent = data.today_count || '-';
+        document.getElementById('confirmedCount').textContent = data.confirmed_count || '-';
+        document.getElementById('pendingCount').textContent = data.pending_count || '-';
+        document.getElementById('stagesCount').textContent = data.stages_count || '-';
     }
 
     function updateCharts(data) {
@@ -761,89 +776,35 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Initialize charts
     stagesChart = configureStagesChart();
     hoursChart = configureHoursChart();
 
-    // Chart Configuration Functions
     function configureStagesChart() {
         const ctx = document.getElementById('stagesChart')?.getContext('2d');
         if (!ctx) return null;
-        
         return new Chart(ctx, {
             type: 'doughnut',
-            data: {
-                labels: [],
-                datasets: [{
-                    data: [],
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.8)',
-                        'rgba(54, 162, 235, 0.8)',
-                        'rgba(255, 206, 86, 0.8)',
-                        'rgba(75, 192, 192, 0.8)',
-                        'rgba(153, 102, 255, 0.8)'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: { 
-                            boxWidth: 12,
-                            font: { size: 11 }
-                        }
-                    }
-                }
-            }
+            data: { labels: [], datasets: [{ data: [], backgroundColor: ['rgba(255, 99, 132, 0.8)','rgba(54, 162, 235, 0.8)','rgba(255, 206, 86, 0.8)','rgba(75, 192, 192, 0.8)','rgba(153, 102, 255, 0.8)'] }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
         });
     }
 
     function configureHoursChart() {
         const ctx = document.getElementById('hoursChart')?.getContext('2d');
         if (!ctx) return null;
-        
         return new Chart(ctx, {
             type: 'bar',
-            data: {
-                labels: [],
-                datasets: [{
-                    data: [],
-                    backgroundColor: 'rgba(54, 162, 235, 0.8)',
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { stepSize: 1 }
-                    }
-                }
-            }
+            data: { labels: [], datasets: [{ data: [], backgroundColor: 'rgba(54, 162, 235, 0.8)', borderColor: 'rgba(54, 162, 235, 1)', borderWidth: 1 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
         });
     }
 
-    // CORRECCIÓN: Función mejorada para actualizar próximas citas
     function updateUpcomingAppointments(appointments) {
         const container = document.getElementById('upcomingAppointments');
         if (!container) return;
 
         if (!appointments?.length) {
-            container.innerHTML = `
-                <div class="text-center text-muted py-5">
-                    <i class="fas fa-calendar-times mb-3 h2"></i>
-                    <p class="mb-0">No hay citas próximas</p>
-                </div>
-            `;
+            container.innerHTML = `<div class="text-center text-muted py-5"><i class="fas fa-calendar-times mb-3 h2"></i><p class="mb-0">No hay citas próximas</p></div>`;
             return;
         }
 
@@ -878,17 +839,13 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
         }).join('');
     }
-
-    // CORRECCIÓN: Hacer la función disponible globalmente
     window.updateUpcomingAppointments = updateUpcomingAppointments;
 
-    // Event Handlers
     if (viewSelector) {
         viewSelector.addEventListener('change', function() {
             currentView = this.value;
             localStorage.setItem('dashboardView', currentView);
             
-            // Refresh data and calendar
             loadDashboardData();
             if (calendar) {
                 calendar.refetchEvents();
@@ -904,10 +861,8 @@ document.addEventListener('DOMContentLoaded', function() {
         showToast('Dashboard actualizado');
     });
 
-    // Initialize Dashboard
     loadDashboardData();
     
-    // Auto-refresh every 5 minutes
     setInterval(() => {
         loadDashboardData();
         calendar?.refetchEvents();
