@@ -9,7 +9,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic import TemplateView, View
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.utils.timezone import make_aware, get_current_timezone
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 from .models import Appointment, SchoolStage, Course, StaffProfile, AvailabilitySlot
 from .serializers import AppointmentSerializer, AvailabilitySlotSerializer, CalendarDaySerializer
 from .forms import StaffAuthenticationForm
-from .emails import send_appointment_confirmation
+from .emails import send_appointment_confirmation, send_appointment_cancellation, send_appointment_modification
 
 # ====================================
 # Part 1.1: Base Functions - CORREGIDO
@@ -588,9 +588,74 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
         except Exception as e:
             logger.error(f"Error deleting slot {slot_id}: {str(e)}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)
+
+# ====================================
+# Part 6: Appointment Cancellation - NUEVO
+# ====================================
+
+class CancelAppointmentView(TemplateView):
+    """Vista para cancelar citas usando el token único"""
+    template_name = 'visits/cancel_appointment.html'
+    
+    def get_appointment(self, token):
+        """Obtiene la cita por su token de cancelación"""
+        try:
+            appointment = get_object_or_404(
+                Appointment.objects.select_related('stage', 'course', 'staff__user'),
+                cancellation_token=token
+            )
+            return appointment
+        except:
+            raise Http404("Enlace de cancelación no válido")
+    
+    def get(self, request, token):
+        """Muestra la página de confirmación de cancelación"""
+        appointment = self.get_appointment(token)
+        
+        # Verificar si la cita puede ser cancelada
+        if not appointment.can_be_cancelled():
+            return render(request, self.template_name, {
+                'appointment': appointment,
+                'error': 'Esta cita no puede ser cancelada'
+            })
+        
+        context = {
+            'appointment': appointment,
+            'can_cancel': True
+        }
+        return render(request, self.template_name, context)
+    
+    def post(self, request, token):
+        """Procesa la cancelación de la cita"""
+        appointment = self.get_appointment(token)
+        
+        # Verificar si la cita puede ser cancelada
+        if not appointment.can_be_cancelled():
+            messages.error(request, 'Esta cita no puede ser cancelada.')
+            return redirect('cancel_appointment', token=token)
+        
+        try:
+            # Cambiar estado a cancelada
+            appointment.status = 'cancelled'
+            appointment.save()
+            
+            # Enviar emails de notificación
+            send_appointment_cancellation(appointment, cancelled_by='family')
+            
+            # Mostrar página de confirmación
+            context = {
+                'appointment': appointment,
+                'cancelled': True
+            }
+            return render(request, self.template_name, context)
+            
+        except Exception as e:
+            logger.error(f"Error cancelando cita {appointment.id}: {str(e)}", exc_info=True)
+            messages.error(request, 'Error al cancelar la cita. Contacte con el centro.')
+            return redirect('cancel_appointment', token=token)
         
 # ====================================
-# Part 6: Appointments CRUD & Basic Views - CORREGIDO
+# Part 7: Appointments CRUD & Basic Views - CORREGIDO CON EMAILS
 # ====================================
 
 class AppointmentsCRUDView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
@@ -847,6 +912,14 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                 ).delete()
                 logger.info(f"Deleted {deleted_slots[0]} overlapping slots for appointment: {appointment.id}")
                 
+                # 7. Enviar email de confirmación
+                try:
+                    send_appointment_confirmation(appointment)
+                    logger.info(f"Confirmation email sent for appointment: {appointment.id}")
+                except Exception as e:
+                    logger.error(f"Error sending confirmation email: {str(e)}", exc_info=True)
+                    # No fallar la creación si el email falla
+                
                 response_data = serializer.data
                 response_data['duration'] = appointment.duration
                 return JsonResponse(response_data)
@@ -882,6 +955,9 @@ class AppointmentAPIView(LoginRequiredMixin, View):
 
             if not is_supervisor:
                 data['staff'] = request.user.staffprofile.id
+
+            # Guardar fecha anterior para comparación
+            old_date = appointment.date
 
             # Procesar fecha si se proporciona
             if 'date' in data:
@@ -979,6 +1055,15 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                     ).delete()
                     logger.info(f"Deleted {deleted_slots[0]} overlapping slots for updated appointment: {appointment_id}")
                 
+                # Enviar email de modificación si cambió la fecha
+                if old_date and old_date != updated_appointment.date:
+                    try:
+                        send_appointment_modification(updated_appointment, old_date=old_date)
+                        logger.info(f"Modification email sent for appointment: {appointment_id}")
+                    except Exception as e:
+                        logger.error(f"Error sending modification email: {str(e)}", exc_info=True)
+                        # No fallar la actualización si el email falla
+                
                 response_data = serializer.data
                 response_data['duration'] = updated_appointment.duration
                 return JsonResponse(response_data)
@@ -1006,6 +1091,14 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                     id=appointment_id,
                     staff=request.user.staffprofile
                 )
+
+            # Enviar email de cancelación antes de eliminar
+            try:
+                send_appointment_cancellation(appointment, cancelled_by='staff')
+                logger.info(f"Cancellation email sent for appointment: {appointment_id}")
+            except Exception as e:
+                logger.error(f"Error sending cancellation email: {str(e)}", exc_info=True)
+                # Continuar con la eliminación aunque falle el email
 
             appointment.delete()
             logger.info(f"Deleted appointment: {appointment_id}")
@@ -1040,7 +1133,7 @@ class AppointmentConfirmationView(TemplateView):
         return context
     
 # ====================================
-# Part 7: Dashboard Views
+# Part 8: Dashboard Views
 # ====================================
 
 class DashboardView(LoginRequiredMixin, TemplateView):
@@ -1293,7 +1386,7 @@ class DashboardStatsView(LoginRequiredMixin, View):
             return JsonResponse({'error': str(e)}, status=500)
         
 # ====================================
-# Part 8: Export Functions
+# Part 9: Export Functions
 # ====================================
 
 from django.contrib.auth.mixins import LoginRequiredMixin

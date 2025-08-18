@@ -4,33 +4,39 @@
     <h1>Confirmación de Visita Escolar</h1>
 </div>
 <div class="content">
-    <p>Hola {{ visitor_name }},</p>
+    <p>Estimado/a {{ visitor_name }},</p>
     
-    <p>Tu visita ha sido confirmada con los siguientes detalles:</p>
+    <p>Su visita ha sido confirmada correctamente:</p>
     
     <div class="appointment-details">
         <h3>Detalles de la cita</h3>
-        <p><strong>Etapa:</strong> {{ appointment.stage.name }}</p>
-        <p><strong>Fecha:</strong> {{ date|date:"l j F Y" }}</p>
-        <p><strong>Hora:</strong> {{ date|date:"H:i" }}</p>
-        <p><strong>Personal asignado:</strong> {{ staff }}</p>
+        <p><strong>Etapa educativa:</strong> {{ appointment.stage.name }}</p>
+        {% if appointment.course %}
+        <p><strong>Curso:</strong> {{ appointment.course.name }}</p>
+        {% endif %}
+        <p><strong>Fecha:</strong> {{ date|date:"l, j \d\e F \d\e Y" }}</p>
+        <p><strong>Hora:</strong> {{ date|date:"H:i" }} h</p>
+        <p><strong>Duración:</strong> {{ appointment.duration }} minutos</p>
+        <p><strong>Atendido por:</strong> {{ staff_name }}</p>
     </div>
 
     <div class="location-details">
-        <h3>Lugar de la visita</h3>
-        <p><strong>Dirección:</strong> Avenida Padre Claret, 3</p>
-        <p><strong>Ciudad:</strong> Segovia</p>
+        <h3>Lugar de encuentro</h3>
+        <p><strong>Dirección:</strong> {{ school_address }}</p>
         <p><strong>Punto de encuentro:</strong> Recepción del centro</p>
     </div>
 
-    <div class="important-info">
-        <p><strong>Duración de la visita:</strong> {{ appointment.duration }} minutos</p>
+    {% if cancel_url %}
+    <div class="cancel-section">
+        <h3>¿Necesita cancelar?</h3>
+        <p>Si no puede asistir a la cita, puede cancelarla utilizando el siguiente enlace:</p>
+        <a href="{{ cancel_url }}" class="button button-cancel">Cancelar Cita</a>
+        <p style="font-size: 12px; color: #6b7280; margin-top: 10px;">
+            Este enlace es único y personal. No lo comparta con terceros.
+        </p>
     </div>
+    {% endif %}
     
-    <p>Si necesitas modificar o cancelar tu cita, por favor contacta con nosotros respondiendo a este email o llamando al centro.</p>
-</div>
-<div class="footer">
-    <p>Este email ha sido enviado automáticamente, por favor no respondas directamente.</p>
-    <p>© {{ year }} Colegio Claret Segovia. Todos los derechos reservados.</p>
+    <p>Si tiene alguna pregunta, puede contactarnos en {{ school_phone }}.</p>
 </div>
 {% endblock %}

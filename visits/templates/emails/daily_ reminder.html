@@ -1,0 +1,55 @@
+{% extends "emails/base_email.html" %}
+{% block content %}
+<div class="header">
+    <h1>Recordatorio de Visitas</h1>
+</div>
+<div class="content">
+    <p>Estimado/a {{ visitor_name }},</p>
+    
+    {% if total_appointments == 1 %}
+        <p>Le recordamos que mañana tiene programada una visita escolar:</p>
+    {% else %}
+        <p>Le recordamos que mañana tiene programadas <strong>{{ total_appointments }} visitas escolares</strong>:</p>
+    {% endif %}
+    
+    {% for appointment in appointments %}
+    <div class="appointment-details">
+        <h3>{% if total_appointments > 1 %}Visita {{ forloop.counter }}{% else %}Detalles de su visita{% endif %}</h3>
+        <p><strong>Etapa educativa:</strong> {{ appointment.stage.name }}</p>
+        {% if appointment.course %}
+        <p><strong>Curso:</strong> {{ appointment.course.name }}</p>
+        {% endif %}
+        <p><strong>Hora:</strong> {{ appointment.date|date:"H:i" }} h</p>
+        <p><strong>Duración:</strong> {{ appointment.duration }} minutos</p>
+        <p><strong>Atendido por:</strong> {{ appointment.staff.user.get_full_name }}</p>
+        
+        {% if appointment.can_be_cancelled %}
+        <p><strong>Cancelar:</strong> 
+            <a href="{{ school_config.base_url }}{% url 'cancel_appointment' token=appointment.cancellation_token %}" 
+               style="color: #ef4444; text-decoration: underline;">
+                Cancelar esta cita
+            </a>
+        </p>
+        {% endif %}
+    </div>
+    
+    {% if not forloop.last %}
+        <hr style="margin: 20px 0; border: 1px solid #e5e7eb;">
+    {% endif %}
+    {% endfor %}
+
+    <div class="location-details">
+        <h3>Información importante</h3>
+        <p><strong>Fecha:</strong> {{ date|date:"l, j \d\e F \d\e Y" }}</p>
+        <p><strong>Dirección:</strong> {{ school_address }}</p>
+        <p><strong>Punto de encuentro:</strong> Recepción del centro</p>
+        {% if total_appointments > 1 %}
+        <p><strong>Nota:</strong> Por favor, llegue puntualmente a cada cita según el horario indicado.</p>
+        {% else %}
+        <p><strong>Nota:</strong> Por favor, llegue puntualmente a la hora indicada.</p>
+        {% endif %}
+    </div>
+    
+    <p>Para cualquier consulta, contacte con nosotros en {{ school_phone }}.</p>
+</div>
+{% endblock %}

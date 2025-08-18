@@ -1,0 +1,36 @@
+{% extends "emails/base_email.html" %}
+{% block content %}
+<div class="header">
+    <h1>Cita Cancelada</h1>
+</div>
+<div class="content">
+    <p>Hola {{ staff_name }},</p>
+    
+    <p>La siguiente cita ha sido cancelada {% if cancelled_by == 'family' %}por la familia{% else %}desde el sistema{% endif %}:</p>
+    
+    <div class="appointment-details">
+        <h3>Datos del visitante</h3>
+        <p><strong>Nombre:</strong> {{ visitor_name }}</p>
+        <p><strong>Email:</strong> {{ visitor_email }}</p>
+        <p><strong>Teléfono:</strong> {{ visitor_phone }}</p>
+    </div>
+
+    <div class="appointment-details">
+        <h3>Cita cancelada</h3>
+        <p><strong>Etapa:</strong> {{ appointment.stage.name }}</p>
+        {% if appointment.course %}
+        <p><strong>Curso:</strong> {{ appointment.course.name }}</p>
+        {% endif %}
+        <p><strong>Fecha:</strong> {{ date|date:"l, j \d\e F \d\e Y" }}</p>
+        <p><strong>Hora:</strong> {{ date|date:"H:i" }} h</p>
+        <p><strong>Duración:</strong> {{ appointment.duration }} minutos</p>
+    </div>
+
+    <div class="important-info">
+        <h3>Actualización de agenda</h3>
+        <p>Ya puedes actualizar tu agenda. Este horario queda libre para nuevas citas.</p>
+    </div>
+    
+    <p>La cancelación ha sido procesada automáticamente en el sistema.</p>
+</div>
+{% endblock %}

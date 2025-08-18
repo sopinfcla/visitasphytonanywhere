@@ -158,12 +158,46 @@ LOGGING = {
     },
 }
 
-# Email Configuration
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.office365.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'soporte.informatico@claretsegoviao365.educamos.com'
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = 'soporte.informatico@claretsegoviao365.educamos.com'
-APPOINTMENT_NOTIFICATION_EMAIL = 'soporte.informatico@claretsegoviao365.educamos.com'
+# ====================================
+# CONFIGURACIÓN DE EMAIL - IONOS
+# ====================================
+
+# Configuración para desarrollo local (ACTIVA)
+if DEBUG:
+    # SMTP REAL con Ionos - ACTIVADO
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.ionos.es')
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+    EMAIL_USE_TLS = True
+    EMAIL_USE_SSL = False  # Para puerto 587
+    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
+    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+    EMAIL_TIMEOUT = 60  # Timeout en segundos
+    
+    # Para debug: descomenta la siguiente línea si quieres ver solo en consola
+    # EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# Configuración para producción
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.ionos.es')
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+    EMAIL_USE_TLS = True
+    EMAIL_USE_SSL = False
+    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
+    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+    EMAIL_TIMEOUT = 60
+
+# Configuración común para ambos entornos
+DEFAULT_FROM_EMAIL = os.environ.get('EMAIL_HOST_USER', 'no-reply@claretsegovia.es')
+APPOINTMENT_NOTIFICATION_EMAIL = os.environ.get('EMAIL_HOST_USER', 'no-reply@claretsegovia.es')
+
+# Configuración de URLs del colegio
+SCHOOL_CONFIG = {
+    'name': 'Colegio Claret Segovia',
+    'address': 'Av. Padre Claret, 3, 40003 Segovia',
+    'phone': '921 42 03 00',
+    'email': os.environ.get('EMAIL_HOST_USER', 'no-reply@claretsegovia.es'),
+    'website': 'https://claretsegovia.es',
+    'base_url': os.environ.get('BASE_URL', 'http://localhost:8000' if DEBUG else 'https://soporteinformatico.pythonanywhere.com')
+}

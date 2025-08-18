@@ -1,0 +1,50 @@
+{% extends "emails/base_email.html" %}
+{% block content %}
+<div class="header">
+    <h1>Cita Modificada</h1>
+</div>
+<div class="content">
+    <p>Estimado/a {{ visitor_name }},</p>
+    
+    <p>Su cita ha sido modificada. A continuación encontrará los nuevos detalles:</p>
+    
+    {% if old_date %}
+    <div class="cancel-section">
+        <h3>Cita anterior (cancelada)</h3>
+        <p><strong>Fecha anterior:</strong> {{ old_date|date:"l, j \d\e F \d\e Y" }}</p>
+        <p><strong>Hora anterior:</strong> {{ old_date|date:"H:i" }} h</p>
+    </div>
+    {% endif %}
+    
+    <div class="appointment-details">
+        <h3>Nueva cita confirmada</h3>
+        <p><strong>Etapa educativa:</strong> {{ appointment.stage.name }}</p>
+        {% if appointment.course %}
+        <p><strong>Curso:</strong> {{ appointment.course.name }}</p>
+        {% endif %}
+        <p><strong>Nueva fecha:</strong> {{ date|date:"l, j \d\e F \d\e Y" }}</p>
+        <p><strong>Nueva hora:</strong> {{ date|date:"H:i" }} h</p>
+        <p><strong>Duración:</strong> {{ appointment.duration }} minutos</p>
+        <p><strong>Atendido por:</strong> {{ staff_name }}</p>
+    </div>
+
+    <div class="location-details">
+        <h3>Lugar de encuentro</h3>
+        <p><strong>Dirección:</strong> {{ school_address }}</p>
+        <p><strong>Punto de encuentro:</strong> Recepción del centro</p>
+    </div>
+
+    {% if cancel_url %}
+    <div class="cancel-section">
+        <h3>¿Necesita cancelar?</h3>
+        <p>Si la nueva fecha no le viene bien, puede cancelar la cita:</p>
+        <a href="{{ cancel_url }}" class="button button-cancel">Cancelar Cita</a>
+        <p style="font-size: 12px; color: #6b7280; margin-top: 10px;">
+            Este enlace es único y personal. No lo comparta con terceros.
+        </p>
+    </div>
+    {% endif %}
+    
+    <p>Para cualquier consulta sobre el cambio, contacte con nosotros en {{ school_phone }}.</p>
+</div>
+{% endblock %}

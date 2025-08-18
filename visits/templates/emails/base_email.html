@@ -13,66 +13,118 @@
             padding: 20px;
             background-color: #f5f5f5;
         }
+        .email-container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
         .header {
-            background-color: #004d99;
+            background-color: #1e40af;
             color: white;
-            padding: 20px;
+            padding: 30px 20px;
             text-align: center;
-            border-radius: 5px 5px 0 0;
         }
         .header h1 {
             margin: 0;
             font-size: 24px;
+            font-weight: 600;
         }
         .content {
-            background-color: #ffffff;
-            padding: 20px;
-            border: 1px solid #e0e0e0;
-            border-radius: 0 0 5px 5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 30px 20px;
         }
-        .footer {
-            background-color: #f5f5f5;
-            padding: 15px;
-            text-align: center;
-            font-size: 12px;
-            border-radius: 5px;
-            margin-top: 20px;
-            color: #666;
+        .appointment-details {
+            background-color: #f8fafc;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 6px;
+            border-left: 4px solid #1e40af;
+        }
+        .location-details {
+            background-color: #f0f9ff;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 6px;
+            border-left: 4px solid #0ea5e9;
+        }
+        .important-info {
+            background-color: #fef3c7;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 6px;
+            border-left: 4px solid #f59e0b;
+        }
+        .cancel-section {
+            background-color: #fef2f2;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 6px;
+            border-left: 4px solid #ef4444;
         }
         .button {
             display: inline-block;
-            padding: 10px 20px;
-            background-color: #004d99;
-            color: white;
+            padding: 12px 24px;
+            background-color: #1e40af;
+            color: white !important;
             text-decoration: none;
-            border-radius: 5px;
-            margin: 20px 0;
-        }
-        .appointment-details, .location-details, .important-info {
-            background-color: #ffffff;
-            padding: 20px;
+            border-radius: 6px;
             margin: 15px 0;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            font-weight: 500;
         }
-        .location-details {
-            border-left: 4px solid #004d99;
+        .button:hover {
+            background-color: #1d4ed8;
         }
-        .important-info {
-            border-left: 4px solid #ffc107;
+        .button-cancel {
+            background-color: #ef4444;
+        }
+        .button-cancel:hover {
+            background-color: #dc2626;
+        }
+        .footer {
+            background-color: #f8fafc;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6b7280;
+            border-top: 1px solid #e5e7eb;
         }
         h3 {
-            color: #004d99;
+            color: #1e40af;
             margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        p {
+            margin-bottom: 15px;
+        }
+        strong {
+            color: #374151;
         }
         @media only screen and (max-width: 600px) {
-            body { padding: 10px; }
-            .header, .content, .footer { padding: 15px; }
+            body { 
+                padding: 10px; 
+            }
+            .header, .content, .footer { 
+                padding: 20px 15px; 
+            }
+            .appointment-details, .location-details, .important-info, .cancel-section {
+                padding: 15px;
+                margin: 15px 0;
+            }
         }
     </style>
 </head>
 <body>
-    {% block content %}{% endblock %}
+    <div class="email-container">
+        {% block content %}{% endblock %}
+        
+        <div class="footer">
+            <p><strong>{{ school_name }}</strong></p>
+            <p>{{ school_address }}</p>
+            <p>Teléfono: {{ school_phone }}</p>
+            <p style="margin-top: 15px;">Este email ha sido enviado automáticamente. Por favor, no respondas directamente.</p>
+            <p>© {{ year }} {{ school_name }}. Todos los derechos reservados.</p>
+        </div>
+    </div>
 </body>
 </html>

@@ -1,0 +1,42 @@
+{% extends "emails/base_email.html" %}
+{% block content %}
+<div class="header">
+    <h1>Cita Cancelada</h1>
+</div>
+<div class="content">
+    <p>Estimado/a {{ visitor_name }},</p>
+    
+    <p>Su cita ha sido cancelada {% if cancelled_by == 'family' %}correctamente{% else %}por el centro{% endif %}:</p>
+    
+    <div class="appointment-details">
+        <h3>Cita cancelada</h3>
+        <p><strong>Etapa educativa:</strong> {{ appointment.stage.name }}</p>
+        {% if appointment.course %}
+        <p><strong>Curso:</strong> {{ appointment.course.name }}</p>
+        {% endif %}
+        <p><strong>Fecha:</strong> {{ date|date:"l, j \d\e F \d\e Y" }}</p>
+        <p><strong>Hora:</strong> {{ date|date:"H:i" }} h</p>
+        <p><strong>Atendido por:</strong> {{ staff_name }}</p>
+    </div>
+
+    {% if cancelled_by == 'family' %}
+    <div class="important-info">
+        <h3>Gracias por avisar</h3>
+        <p>Agradecemos que nos haya comunicado la cancelación con antelación.</p>
+    </div>
+    {% else %}
+    <div class="important-info">
+        <h3>Disculpe las molestias</h3>
+        <p>Lamentamos tener que cancelar su cita. Nos pondremos en contacto con usted para reprogramarla.</p>
+    </div>
+    {% endif %}
+
+    <div class="location-details">
+        <h3>¿Desea una nueva cita?</h3>
+        <p>Si está interesado en programar una nueva visita, puede hacerlo a través de nuestro sistema de reservas o contactándonos directamente.</p>
+        <p><strong>Teléfono:</strong> {{ school_phone }}</p>
+    </div>
+    
+    <p>Quedamos a su disposición para cualquier consulta.</p>
+</div>
+{% endblock %}

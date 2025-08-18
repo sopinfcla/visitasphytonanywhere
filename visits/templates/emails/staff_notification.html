@@ -4,26 +4,37 @@
     <h1>Nueva Visita Programada</h1>
 </div>
 <div class="content">
-    <p>Hola {{ staff.get_full_name }},</p>
+    <p>Hola {{ staff_name }},</p>
     
     <p>Se ha programado una nueva visita para la etapa de {{ appointment.stage.name }}:</p>
     
     <div class="appointment-details">
-        <h3>Detalles del visitante</h3>
+        <h3>Datos del visitante</h3>
         <p><strong>Nombre:</strong> {{ visitor_name }}</p>
         <p><strong>Email:</strong> {{ visitor_email }}</p>
         <p><strong>Teléfono:</strong> {{ visitor_phone }}</p>
+        {% if appointment.comments %}
+        <p><strong>Comentarios:</strong> {{ appointment.comments }}</p>
+        {% endif %}
     </div>
 
     <div class="appointment-details">
         <h3>Detalles de la visita</h3>
-        <p><strong>Fecha:</strong> {{ date|date:"l j F Y" }}</p>
-        <p><strong>Hora:</strong> {{ date|date:"H:i" }}</p>
+        <p><strong>Etapa:</strong> {{ appointment.stage.name }}</p>
+        {% if appointment.course %}
+        <p><strong>Curso:</strong> {{ appointment.course.name }}</p>
+        {% endif %}
+        <p><strong>Fecha:</strong> {{ date|date:"l, j \d\e F \d\e Y" }}</p>
+        <p><strong>Hora:</strong> {{ date|date:"H:i" }} h</p>
         <p><strong>Duración:</strong> {{ appointment.duration }} minutos</p>
-        <p><strong>Lugar:</strong> Recepción del centro (Avenida Padre Claret, 3, Segovia)</p>
     </div>
-</div>
-<div class="footer">
-    <p>© {{ year }} Colegio Claret Segovia. Todos los derechos reservados.</p>
+
+    <div class="location-details">
+        <h3>Lugar de encuentro</h3>
+        <p><strong>Dirección:</strong> {{ school_address }}</p>
+        <p><strong>Punto de encuentro:</strong> Recepción del centro</p>
+    </div>
+    
+    <p>Recuerda revisar tu agenda y preparar la información relevante para la visita.</p>
 </div>
 {% endblock %}

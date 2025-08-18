@@ -2,11 +2,13 @@
 # Part 1: Imports and Configuration - CORREGIDO
 # ====================================
 
+import uuid
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import make_aware, localtime, get_current_timezone
+from django.utils import timezone
 from datetime import datetime, timedelta, time
 import calendar
 import logging
@@ -116,7 +118,7 @@ class StaffProfile(models.Model):
         return False
 
 # ====================================
-# Part 3: Appointment Management - CORREGIDO
+# Part 3: Appointment Management - CORREGIDO CON TOKEN
 # ====================================
 
 class Appointment(models.Model):
@@ -146,12 +148,16 @@ class Appointment(models.Model):
     follow_up_date = models.DateField(null=True, blank=True, help_text="Fecha de seguimiento")
     reminder_sent = models.BooleanField(default=False)
     
+    # TOKEN ÚNICO PARA CANCELACIÓN
+    cancellation_token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    
     class Meta:
         ordering = ['-date']
         indexes = [
             models.Index(fields=['date']),
             models.Index(fields=['staff', 'date']),
             models.Index(fields=['status']),
+            models.Index(fields=['cancellation_token']),
         ]
     
     def clean(self):
@@ -241,6 +247,14 @@ class Appointment(models.Model):
         self.full_clean()
         logger.debug(f"Guardando cita para {self.visitor_name} a las {self.date}")
         super().save(*args, **kwargs)
+    
+    def is_past(self):
+        """Verifica si la cita ya pasó"""
+        return self.date < timezone.now()
+    
+    def can_be_cancelled(self):
+        """Verifica si la cita puede ser cancelada (no ha pasado y no está cancelada)"""
+        return not self.is_past() and self.status != 'cancelled'
     
     def __str__(self):
         course_info = f" - {self.course.name}" if self.course else ""

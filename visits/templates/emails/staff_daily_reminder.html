@@ -1,0 +1,47 @@
+{% extends "emails/base_email.html" %}
+{% block content %}
+<div class="header">
+    <h1>Recordatorio de Visitas</h1>
+</div>
+<div class="content">
+    <p>Hola {{ staff_name }},</p>
+    
+    {% if total_appointments == 1 %}
+        <p>Te recordamos que mañana tienes programada <strong>1 visita escolar</strong>:</p>
+    {% else %}
+        <p>Te recordamos que mañana tienes programadas <strong>{{ total_appointments }} visitas escolares</strong>:</p>
+    {% endif %}
+    
+    {% for appointment in appointments %}
+    <div class="appointment-details">
+        <h3>{% if total_appointments > 1 %}Visita {{ forloop.counter }}{% else %}Detalles de la visita{% endif %}</h3>
+        <p><strong>Familia:</strong> {{ appointment.visitor_name }}</p>
+        <p><strong>Email:</strong> {{ appointment.visitor_email }}</p>
+        <p><strong>Teléfono:</strong> {{ appointment.visitor_phone }}</p>
+        <p><strong>Etapa:</strong> {{ appointment.stage.name }}</p>
+        {% if appointment.course %}
+        <p><strong>Curso:</strong> {{ appointment.course.name }}</p>
+        {% endif %}
+        <p><strong>Hora:</strong> {{ appointment.date|date:"H:i" }} h</p>
+        <p><strong>Duración:</strong> {{ appointment.duration }} minutos</p>
+        {% if appointment.comments %}
+        <p><strong>Comentarios:</strong> {{ appointment.comments }}</p>
+        {% endif %}
+    </div>
+    
+    {% if not forloop.last %}
+        <hr style="margin: 20px 0; border: 1px solid #e5e7eb;">
+    {% endif %}
+    {% endfor %}
+
+    <div class="location-details">
+        <h3>Información importante</h3>
+        <p><strong>Fecha:</strong> {{ date|date:"l, j \d\e F \d\e Y" }}</p>
+        <p><strong>Lugar:</strong> {{ school_address }}</p>
+        <p><strong>Punto de encuentro:</strong> Recepción del centro</p>
+
+    </div>
+    
+    <p>¡Que tengas un buen día de visitas! 😊</p>
+</div>
+{% endblock %}

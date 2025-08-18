@@ -8,7 +8,8 @@ from .views import (
     DashboardView,
     DashboardStatsView,
     DashboardCalendarView,
-    AppointmentExportView  # Añadimos el nuevo import
+    AppointmentExportView,
+    CancelAppointmentView  # Nuevo import para cancelación
 )
 
 urlpatterns = [
@@ -28,6 +29,9 @@ urlpatterns = [
          name='appointment_confirmation'),
     path('privacy-policy/', views.PrivacyPolicyView.as_view(), name='privacy_policy'),
     
+    # Nueva ruta para cancelación de citas
+    path('cancel/<uuid:token>/', CancelAppointmentView.as_view(), name='cancel_appointment'),
+    
     # Vistas del panel de administración
     path('dashboard/', DashboardView.as_view(), name='dashboard'),
     path('dashboard/stats/', DashboardStatsView.as_view(), name='dashboard_stats'),
@@ -46,7 +50,7 @@ urlpatterns = [
     path('api/appointments/', views.AppointmentAPIView.as_view(), name='api_appointments'),
     path('api/appointments/<int:appointment_id>/', views.AppointmentAPIView.as_view(), name='api_appointment_detail'),
     
-    # Nuevos endpoints para exportación
+    # Endpoints para exportación
     path('api/appointments/export/', AppointmentExportView.as_view(), name='appointment_export'),
     path('api/appointments/<int:appointment_id>/export/', AppointmentExportView.as_view(), name='appointment_single_export'),
 
