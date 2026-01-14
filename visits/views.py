@@ -1324,22 +1324,20 @@ class DashboardStatsView(LoginRequiredMixin, View):
                 'stages_count': staff_profile.allowed_stages.count() if not is_supervisor else SchoolStage.objects.count()
             }
 
-            # Estadísticas por etapa 
-            stats_by_stage = []
+            # Estadísticas por etapa - FORMATO CORREGIDO para dashboard.html
+            stages_distribution = []
             stages_queryset = staff_profile.allowed_stages.all() if not is_supervisor else SchoolStage.objects.all()
             
             for stage in stages_queryset:
-                appointments = base_queryset.filter(stage=stage)
-                stats_by_stage.append({
-                    'stage_name': stage.name,
-                    'total': appointments.count(),
-                    'pending': appointments.filter(status='pending').count(),
-                    'completed': appointments.filter(status='completed').count(),
-                    'cancelled': appointments.filter(status='cancelled').count()
-                })
+                stage_count = base_queryset.filter(stage=stage).count()
+                if stage_count > 0:  # Solo incluir etapas con citas
+                    stages_distribution.append({
+                        'stage': stage.name,
+                        'count': stage_count
+                    })
 
-            # Horas más populares
-            popular_hours = (
+            # Horas más populares - FORMATO CORREGIDO
+            popular_hours_query = (
                 base_queryset
                 .filter(date__gte=today_start)
                 .annotate(
@@ -1347,10 +1345,17 @@ class DashboardStatsView(LoginRequiredMixin, View):
                 )
                 .values('hour')
                 .annotate(count=Count('id'))
-                .order_by('-count')[:5]
+                .order_by('-count')[:10]
             )
+            
+            popular_hours = [
+                {
+                    'hour': f"{item['hour']:02d}:00",
+                    'count': item['count']
+                } for item in popular_hours_query
+            ]
 
-            # Próximas citas
+            # Próximas citas - CAMPOS CORREGIDOS con stage__name
             upcoming = (
                 base_queryset
                 .filter(
@@ -1361,12 +1366,13 @@ class DashboardStatsView(LoginRequiredMixin, View):
             )
 
             response_data = {
-                'stats_by_stage': stats_by_stage,
-                'popular_hours': list(popular_hours),
+                'stages_distribution': stages_distribution,  # NOMBRE CORREGIDO
+                'popular_hours': popular_hours,
                 'upcoming_appointments': [
                     {
                         'id': apt.id,
                         'visitor_name': apt.visitor_name,
+                        'stage__name': apt.stage.name,  # CAMPO AGREGADO para dashboard.html
                         'stage': apt.stage.name,
                         'course': apt.course.name if apt.course else '',
                         'date': timezone.localtime(apt.date).isoformat(),
@@ -1633,4 +1639,224 @@ class AppointmentExportView(LoginRequiredMixin, View):
             return response
         except Exception as e:
             logger.error(f"Error generando exportación: {str(e)}", exc_info=True)
+            return JsonResponse({'error': str(e)}, status=500)
+# ====================================
+# GESTIÓN DE USUARIOS - AGREGADO
+# ====================================
+
+class UserManagementView(LoginRequiredMixin, TemplateView):
+    """Vista principal para gestión de usuarios - Solo admin"""
+    template_name = 'visits/user_management.html'
+    
+    def dispatch(self, request, *args, **kwargs):
+        # Solo superusuarios pueden acceder
+        if not request.user.is_superuser:
+            messages.error(request, 'No tienes permisos para acceder a la gestión de usuarios.')
+            return redirect('dashboard')
+        return super().dispatch(request, *args, **kwargs)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['all_stages'] = SchoolStage.objects.all()
+        return context
+
+
+class UserAPIView(LoginRequiredMixin, View):
+    """API para CRUD de usuarios"""
+    
+    def dispatch(self, request, *args, **kwargs):
+        # Solo superusuarios
+        if not request.user.is_superuser:
+            return JsonResponse({'error': 'Sin permisos'}, status=403)
+        return super().dispatch(request, *args, **kwargs)
+    
+    def get(self, request, user_id=None):
+        """Obtener lista de usuarios o usuario específico"""
+        try:
+            if user_id:
+                # Usuario específico
+                user = get_object_or_404(User, id=user_id)
+                profile = getattr(user, 'staffprofile', None)
+                
+                data = {
+                    'id': user.id,
+                    'username': user.username,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'email': user.email,
+                    'is_active': user.is_active,
+                    'is_staff': user.is_staff,
+                    'is_superuser': user.is_superuser,
+                    'date_joined': user.date_joined.isoformat(),
+                    'last_login': user.last_login.isoformat() if user.last_login else None,
+                    'has_profile': profile is not None,
+                    'allowed_stages': [s.id for s in profile.allowed_stages.all()] if profile else [],
+                    'notify_new_appointment': profile.notify_new_appointment if profile else True,
+                    'notify_reminder': profile.notify_reminder if profile else True,
+                }
+                return JsonResponse(data)
+            else:
+                # Lista de todos los usuarios
+                users = User.objects.all().select_related('staffprofile').prefetch_related('staffprofile__allowed_stages')
+                
+                data = []
+                for user in users:
+                    profile = getattr(user, 'staffprofile', None)
+                    stages_names = ', '.join([s.name for s in profile.allowed_stages.all()]) if profile else '-'
+                    
+                    data.append({
+                        'id': user.id,
+                        'username': user.username,
+                        'full_name': user.get_full_name() or user.username,
+                        'email': user.email,
+                        'is_active': user.is_active,
+                        'is_staff': user.is_staff,
+                        'is_superuser': user.is_superuser,
+                        'stages': stages_names,
+                        'stages_count': profile.allowed_stages.count() if profile else 0,
+                        'last_login': user.last_login.strftime('%d/%m/%Y %H:%M') if user.last_login else 'Nunca',
+                        'date_joined': user.date_joined.strftime('%d/%m/%Y'),
+                    })
+                
+                return JsonResponse(data, safe=False)
+                
+        except Exception as e:
+            logger.error(f"Error en UserAPIView GET: {str(e)}", exc_info=True)
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    def post(self, request):
+        """Crear nuevo usuario"""
+        try:
+            data = json.loads(request.body)
+            
+            # Validaciones
+            username = data.get('username', '').strip()
+            email = data.get('email', '').strip()
+            password = data.get('password', '').strip()
+            first_name = data.get('first_name', '').strip()
+            last_name = data.get('last_name', '').strip()
+            
+            if not username or not password:
+                return JsonResponse({'error': 'Usuario y contraseña son obligatorios'}, status=400)
+            
+            if User.objects.filter(username=username).exists():
+                return JsonResponse({'error': 'El nombre de usuario ya existe'}, status=400)
+            
+            if email and User.objects.filter(email=email).exists():
+                return JsonResponse({'error': 'El email ya está en uso'}, status=400)
+            
+            with transaction.atomic():
+                # Crear usuario
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    password=password,
+                    first_name=first_name,
+                    last_name=last_name,
+                    is_staff=data.get('is_staff', False),
+                    is_superuser=data.get('is_superuser', False),
+                    is_active=data.get('is_active', True)
+                )
+                
+                # Crear o actualizar perfil si es staff
+                if user.is_staff:
+                    profile, created = StaffProfile.objects.get_or_create(user=user)
+                    
+                    # Asignar etapas
+                    stage_ids = data.get('allowed_stages', [])
+                    if stage_ids:
+                        profile.allowed_stages.set(SchoolStage.objects.filter(id__in=stage_ids))
+                    
+                    # Notificaciones
+                    profile.notify_new_appointment = data.get('notify_new_appointment', True)
+                    profile.notify_reminder = data.get('notify_reminder', True)
+                    profile.save()
+                
+                logger.info(f"Usuario {username} creado por {request.user.username}")
+                return JsonResponse({
+                    'status': 'success',
+                    'message': f'Usuario {username} creado correctamente',
+                    'user_id': user.id
+                })
+                
+        except Exception as e:
+            logger.error(f"Error creando usuario: {str(e)}", exc_info=True)
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    def put(self, request, user_id):
+        """Actualizar usuario existente"""
+        try:
+            data = json.loads(request.body)
+            user = get_object_or_404(User, id=user_id)
+            
+            # No permitir que un usuario se quite permisos de superadmin a sí mismo
+            if user == request.user and not data.get('is_superuser', False):
+                return JsonResponse({'error': 'No puedes quitarte permisos de superadmin a ti mismo'}, status=400)
+            
+            with transaction.atomic():
+                # Actualizar datos básicos
+                user.first_name = data.get('first_name', user.first_name)
+                user.last_name = data.get('last_name', user.last_name)
+                user.email = data.get('email', user.email)
+                user.is_staff = data.get('is_staff', user.is_staff)
+                user.is_superuser = data.get('is_superuser', user.is_superuser)
+                user.is_active = data.get('is_active', user.is_active)
+                
+                # Cambiar contraseña si se proporciona
+                new_password = data.get('new_password', '').strip()
+                if new_password:
+                    user.set_password(new_password)
+                
+                user.save()
+                
+                # Crear/actualizar perfil si es staff
+                if user.is_staff:
+                    profile, created = StaffProfile.objects.get_or_create(user=user)
+                    
+                    # Asignar etapas
+                    stage_ids = data.get('allowed_stages', [])
+                    if stage_ids:
+                        profile.allowed_stages.set(SchoolStage.objects.filter(id__in=stage_ids))
+                    else:
+                        profile.allowed_stages.clear()
+                    
+                    # Notificaciones
+                    profile.notify_new_appointment = data.get('notify_new_appointment', True)
+                    profile.notify_reminder = data.get('notify_reminder', True)
+                    profile.save()
+                elif hasattr(user, 'staffprofile'):
+                    # Si ya no es staff, eliminar perfil
+                    user.staffprofile.delete()
+                
+                logger.info(f"Usuario {user.username} actualizado por {request.user.username}")
+                return JsonResponse({
+                    'status': 'success',
+                    'message': f'Usuario {user.username} actualizado correctamente'
+                })
+                
+        except Exception as e:
+            logger.error(f"Error actualizando usuario: {str(e)}", exc_info=True)
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    def delete(self, request, user_id):
+        """Eliminar usuario (soft delete - desactivar)"""
+        try:
+            user = get_object_or_404(User, id=user_id)
+            
+            # No permitir eliminar al propio usuario
+            if user == request.user:
+                return JsonResponse({'error': 'No puedes eliminarte a ti mismo'}, status=400)
+            
+            # Soft delete - desactivar en lugar de eliminar
+            user.is_active = False
+            user.save()
+            
+            logger.info(f"Usuario {user.username} desactivado por {request.user.username}")
+            return JsonResponse({
+                'status': 'success',
+                'message': f'Usuario {user.username} desactivado correctamente'
+            })
+            
+        except Exception as e:
+            logger.error(f"Error eliminando usuario: {str(e)}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)

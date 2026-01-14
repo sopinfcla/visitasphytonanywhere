@@ -104,7 +104,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Configuración de Autenticación
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
-LOGOUT_REDIRECT_URL = 'public_booking'
+LOGOUT_REDIRECT_URL = 'login'
 
 # Configuración de Sesiones
 SESSION_COOKIE_AGE = 86400  # 24 horas

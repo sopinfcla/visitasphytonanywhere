@@ -1,0 +1,771 @@
+{% extends "admin_base.html" %}
+{% load static %}
+
+{% block page_title %}Gestión de Usuarios{% endblock %}
+
+{% block extra_css %}
+<!-- DataTables CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css"/>
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css"/>
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<!-- Toastify -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+
+<style>
+    /* Badges personalizados */
+    .badge-role {
+        padding: 0.5rem 0.75rem;
+        border-radius: 8px;
+        font-weight: 500;
+        font-size: 0.8rem;
+    }
+    
+    .badge-superadmin {
+        background: linear-gradient(135deg, #dc3545, #c82333);
+        color: white;
+    }
+    
+    .badge-staff {
+        background: linear-gradient(135deg, #703D80, #5A3166);
+        color: white;
+    }
+    
+    .badge-user {
+        background: linear-gradient(135deg, #6c757d, #5a6268);
+        color: white;
+    }
+    
+    /* Status badges */
+    .status-active {
+        background-color: #d1e7dd;
+        color: #0f5132;
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    
+    .status-inactive {
+        background-color: #f8d7da;
+        color: #842029;
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    
+    /* Modal mejorado */
+    .modal-header {
+        background: linear-gradient(135deg, #703D80, #5A3166);
+        color: white;
+        border-radius: 12px 12px 0 0;
+    }
+    
+    .modal-content {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
+    
+    .form-check-input:checked {
+        background-color: #703D80;
+        border-color: #703D80;
+    }
+    
+    /* Tabs modernos */
+    .nav-tabs .nav-link {
+        border-radius: 8px 8px 0 0;
+        color: #6c757d;
+        font-weight: 500;
+        border: none;
+        border-bottom: 3px solid transparent;
+    }
+    
+    .nav-tabs .nav-link.active {
+        color: #703D80;
+        border-bottom-color: #703D80;
+        background-color: transparent;
+    }
+    
+    .nav-tabs .nav-link:hover {
+        border-bottom-color: #5A3166;
+    }
+</style>
+{% endblock %}
+
+{% block admin_content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm" style="border-radius: 12px;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0 fw-bold">
+                                <i class="bi bi-people-fill me-2" style="color: #703D80;"></i>
+                                Gestión de Usuarios
+                            </h4>
+                            <p class="text-muted mb-0">Administrar usuarios del sistema</p>
+                        </div>
+                        <div>
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick="prepareNewUser()">
+                                <i class="bi bi-person-plus-fill me-2"></i>Nuevo Usuario
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros rápidos -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm" style="border-radius: 12px;">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-filter me-1"></i>Filtrar por rol
+                            </label>
+                            <select id="roleFilter" class="form-select">
+                                <option value="">Todos los roles</option>
+                                <option value="superadmin">Superadmin</option>
+                                <option value="staff">Staff</option>
+                                <option value="user">Usuario normal</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-toggles me-1"></i>Estado
+                            </label>
+                            <select id="statusFilter" class="form-select">
+                                <option value="">Todos</option>
+                                <option value="active">Activos</option>
+                                <option value="inactive">Inactivos</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-mortarboard me-1"></i>Etapa
+                            </label>
+                            <select id="stageFilter" class="form-select">
+                                <option value="">Todas las etapas</option>
+                                {% for stage in all_stages %}
+                                <option value="{{ stage.name }}">{{ stage.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button id="resetFilters" class="btn btn-outline-secondary w-100">
+                                <i class="bi bi-arrow-counterclockwise me-2"></i>Resetear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de usuarios -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm" style="border-radius: 12px;">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="usersTable" class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Usuario</th>
+                                    <th>Email</th>
+                                    <th>Rol</th>
+                                    <th>Etapas</th>
+                                    <th>Estado</th>
+                                    <th>Último acceso</th>
+                                    <th class="text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Crear/Editar Usuario -->
+<div class="modal fade" id="userModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="userModalTitle">
+                    <i class="bi bi-person-fill-gear me-2"></i>
+                    <span id="modalTitleText">Nuevo Usuario</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <input type="hidden" id="userId" name="user_id">
+                    
+                    <!-- Tabs -->
+                    <ul class="nav nav-tabs mb-4" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#basic" type="button">
+                                <i class="bi bi-person-badge me-2"></i>Datos Básicos
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="permissions-tab" data-bs-toggle="tab" data-bs-target="#permissions" type="button">
+                                <i class="bi bi-shield-check me-2"></i>Permisos
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="stages-tab" data-bs-toggle="tab" data-bs-target="#stages" type="button">
+                                <i class="bi bi-mortarboard me-2"></i>Etapas
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <!-- Tab: Datos Básicos -->
+                        <div class="tab-pane fade show active" id="basic">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="username" class="form-label fw-semibold">
+                                        <i class="bi bi-person me-1"></i>Nombre de usuario *
+                                    </label>
+                                    <input type="text" class="form-control" id="username" name="username" required>
+                                    <small class="text-muted">Sin espacios, único en el sistema</small>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <label for="email" class="form-label fw-semibold">
+                                        <i class="bi bi-envelope me-1"></i>Email *
+                                    </label>
+                                    <input type="email" class="form-control" id="email" name="email" required>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <label for="firstName" class="form-label fw-semibold">
+                                        <i class="bi bi-person-badge me-1"></i>Nombre
+                                    </label>
+                                    <input type="text" class="form-control" id="firstName" name="first_name">
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <label for="lastName" class="form-label fw-semibold">
+                                        <i class="bi bi-person-badge-fill me-1"></i>Apellidos
+                                    </label>
+                                    <input type="text" class="form-control" id="lastName" name="last_name">
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <label for="password" class="form-label fw-semibold">
+                                        <i class="bi bi-key me-1"></i><span id="passwordLabel">Contraseña *</span>
+                                    </label>
+                                    <input type="password" class="form-control" id="password" name="password">
+                                    <small class="text-muted" id="passwordHelp">Mínimo 8 caracteres</small>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <label for="passwordConfirm" class="form-label fw-semibold">
+                                        <i class="bi bi-key-fill me-1"></i>Confirmar contraseña
+                                    </label>
+                                    <input type="password" class="form-control" id="passwordConfirm" name="password_confirm">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab: Permisos -->
+                        <div class="tab-pane fade" id="permissions">
+                            <div class="row g-4">
+                                <div class="col-12">
+                                    <div class="card border-danger">
+                                        <div class="card-body">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="isSuperuser" name="is_superuser">
+                                                <label class="form-check-label fw-bold text-danger" for="isSuperuser">
+                                                    <i class="bi bi-shield-fill-exclamation me-2"></i>
+                                                    Superadministrador
+                                                </label>
+                                                <div class="form-text">Acceso total al sistema, incluyendo gestión de usuarios</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-12">
+                                    <div class="card border-primary">
+                                        <div class="card-body">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="isStaff" name="is_staff">
+                                                <label class="form-check-label fw-bold" for="isStaff" style="color: #703D80;">
+                                                    <i class="bi bi-person-badge me-2"></i>
+                                                    Miembro del Staff
+                                                </label>
+                                                <div class="form-text">Puede gestionar citas y disponibilidad</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-12">
+                                    <div class="card border-success">
+                                        <div class="card-body">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="isActive" name="is_active" checked>
+                                                <label class="form-check-label fw-bold text-success" for="isActive">
+                                                    <i class="bi bi-check-circle me-2"></i>
+                                                    Cuenta activa
+                                                </label>
+                                                <div class="form-text">Usuario puede iniciar sesión</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-12" id="notificationsSection" style="display: none;">
+                                    <div class="card">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0">
+                                                <i class="bi bi-bell me-2"></i>Notificaciones
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="form-check form-switch mb-3">
+                                                <input class="form-check-input" type="checkbox" id="notifyNew" name="notify_new_appointment" checked>
+                                                <label class="form-check-label" for="notifyNew">
+                                                    Notificar nuevas citas
+                                                </label>
+                                            </div>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="notifyReminder" name="notify_reminder" checked>
+                                                <label class="form-check-label" for="notifyReminder">
+                                                    Recordatorios 24h antes
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab: Etapas -->
+                        <div class="tab-pane fade" id="stages">
+                            <div id="stagesSection" style="display: none;">
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    Selecciona las etapas educativas que este usuario puede gestionar
+                                </div>
+                                
+                                <div class="row g-3">
+                                    {% for stage in all_stages %}
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-body">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" 
+                                                           name="allowed_stages" 
+                                                           value="{{ stage.id }}" 
+                                                           id="stage{{ stage.id }}">
+                                                    <label class="form-check-label fw-semibold" for="stage{{ stage.id }}">
+                                                        <i class="bi bi-mortarboard me-2" style="color: #703D80;"></i>
+                                                        {{ stage.name }}
+                                                    </label>
+                                                    <div class="form-text">{{ stage.description|truncatewords:10 }}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            
+                            <div id="stagesDisabledMessage" class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                Active "Miembro del Staff" en la pestaña de Permisos para asignar etapas
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveUser">
+                    <i class="bi bi-check-circle me-2"></i>Guardar Usuario
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
+<script>
+// Configuración global
+const API_URL = '{% url "api_users" %}';
+const CSRF_TOKEN = '{{ csrf_token }}';
+let usersTable;
+let editingUserId = null;
+
+// Inicializar
+$(document).ready(function() {
+    initializeDataTable();
+    initializeEventListeners();
+});
+
+function initializeDataTable() {
+    usersTable = $('#usersTable').DataTable({
+        ajax: {
+            url: API_URL,
+            dataSrc: ''
+        },
+        columns: [
+            { 
+                data: 'full_name',
+                render: function(data, type, row) {
+                    return `
+                        <div class="d-flex align-items-center">
+                            <div class="rounded-circle bg-primary bg-opacity-10 p-2 me-3">
+                                <i class="bi bi-person-fill" style="color: #703D80; font-size: 1.2rem;"></i>
+                            </div>
+                            <div>
+                                <div class="fw-semibold">${data}</div>
+                                <small class="text-muted">${row.username}</small>
+                            </div>
+                        </div>
+                    `;
+                }
+            },
+            { data: 'email' },
+            {
+                data: null,
+                render: function(data, type, row) {
+                    if (row.is_superuser) {
+                        return '<span class="badge badge-role badge-superadmin"><i class="bi bi-shield-fill-exclamation me-1"></i>Superadmin</span>';
+                    } else if (row.is_staff) {
+                        return '<span class="badge badge-role badge-staff"><i class="bi bi-person-badge me-1"></i>Staff</span>';
+                    } else {
+                        return '<span class="badge badge-role badge-user"><i class="bi bi-person me-1"></i>Usuario</span>';
+                    }
+                }
+            },
+            {
+                data: 'stages',
+                render: function(data, type, row) {
+                    if (row.stages_count > 0) {
+                        return `<span class="badge bg-light text-dark">${row.stages_count} etapa(s)</span>`;
+                    }
+                    return '<span class="text-muted">-</span>';
+                }
+            },
+            {
+                data: 'is_active',
+                render: function(data) {
+                    return data ? 
+                        '<span class="status-active"><i class="bi bi-check-circle me-1"></i>Activo</span>' :
+                        '<span class="status-inactive"><i class="bi bi-x-circle me-1"></i>Inactivo</span>';
+                }
+            },
+            { data: 'last_login' },
+            {
+                data: null,
+                orderable: false,
+                className: 'text-center',
+                render: function(data, type, row) {
+                    return `
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="editUser(${row.id})" title="Editar">
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="deleteUser(${row.id}, '${row.username}')" title="Desactivar">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    `;
+                }
+            }
+        ],
+        order: [[0, 'asc']],
+        responsive: true,
+        language: {
+            url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json'
+        },
+        pageLength: 25
+    });
+}
+
+function initializeEventListeners() {
+    // Guardar usuario
+    $('#saveUser').on('click', saveUser);
+    
+    // Mostrar/ocultar secciones según permisos
+    $('#isStaff').on('change', function() {
+        if (this.checked) {
+            $('#stagesSection').show();
+            $('#stagesDisabledMessage').hide();
+            $('#notificationsSection').show();
+        } else {
+            $('#stagesSection').hide();
+            $('#stagesDisabledMessage').show();
+            $('#notificationsSection').hide();
+        }
+    });
+    
+    // Filtros
+    $('#roleFilter, #statusFilter, #stageFilter').on('change', function() {
+        usersTable.draw();
+    });
+    
+    $('#resetFilters').on('click', function() {
+        $('#roleFilter, #statusFilter, #stageFilter').val('');
+        usersTable.draw();
+    });
+    
+    // Filtro personalizado DataTables
+    $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+        const row = usersTable.row(dataIndex).data();
+        
+        // Filtro por rol
+        const roleFilter = $('#roleFilter').val();
+        if (roleFilter) {
+            if (roleFilter === 'superadmin' && !row.is_superuser) return false;
+            if (roleFilter === 'staff' && !row.is_staff) return false;
+            if (roleFilter === 'user' && (row.is_staff || row.is_superuser)) return false;
+        }
+        
+        // Filtro por estado
+        const statusFilter = $('#statusFilter').val();
+        if (statusFilter) {
+            if (statusFilter === 'active' && !row.is_active) return false;
+            if (statusFilter === 'inactive' && row.is_active) return false;
+        }
+        
+        // Filtro por etapa
+        const stageFilter = $('#stageFilter').val();
+        if (stageFilter && !row.stages.includes(stageFilter)) return false;
+        
+        return true;
+    });
+}
+
+function prepareNewUser() {
+    editingUserId = null;
+    $('#userForm')[0].reset();
+    $('#userId').val('');
+    $('#modalTitleText').text('Nuevo Usuario');
+    $('#passwordLabel').text('Contraseña *');
+    $('#password').attr('required', true);
+    $('#passwordHelp').text('Mínimo 8 caracteres');
+    $('#stagesSection').hide();
+    $('#stagesDisabledMessage').show();
+    $('#notificationsSection').hide();
+    $('#isActive').prop('checked', true);
+    
+    // Volver al primer tab
+    $('#basic-tab').tab('show');
+}
+
+async function editUser(userId) {
+    try {
+        const response = await fetch(`${API_URL}${userId}/`);
+        const user = await response.json();
+        
+        editingUserId = userId;
+        $('#userId').val(userId);
+        $('#modalTitleText').text('Editar Usuario');
+        
+        // Llenar formulario
+        $('#username').val(user.username).attr('readonly', true);
+        $('#email').val(user.email);
+        $('#firstName').val(user.first_name);
+        $('#lastName').val(user.last_name);
+        $('#isSuperuser').prop('checked', user.is_superuser);
+        $('#isStaff').prop('checked', user.is_staff);
+        $('#isActive').prop('checked', user.is_active);
+        
+        // Contraseña opcional al editar
+        $('#password').attr('required', false);
+        $('#passwordLabel').text('Nueva contraseña (opcional)');
+        $('#passwordHelp').text('Dejar en blanco para mantener la actual');
+        $('#password').val('');
+        $('#passwordConfirm').val('');
+        
+        // Notificaciones
+        if (user.has_profile) {
+            $('#notifyNew').prop('checked', user.notify_new_appointment);
+            $('#notifyReminder').prop('checked', user.notify_reminder);
+        }
+        
+        // Etapas
+        $('input[name="allowed_stages"]').prop('checked', false);
+        user.allowed_stages.forEach(stageId => {
+            $(`#stage${stageId}`).prop('checked', true);
+        });
+        
+        // Mostrar secciones si es staff
+        if (user.is_staff) {
+            $('#stagesSection').show();
+            $('#stagesDisabledMessage').hide();
+            $('#notificationsSection').show();
+        } else {
+            $('#stagesSection').hide();
+            $('#stagesDisabledMessage').show();
+            $('#notificationsSection').hide();
+        }
+        
+        // Abrir modal
+        new bootstrap.Modal($('#userModal')).show();
+        
+    } catch (error) {
+        console.error('Error cargando usuario:', error);
+        showToast('Error al cargar usuario', 'error');
+    }
+}
+
+async function saveUser() {
+    const form = $('#userForm')[0];
+    
+    // Validar formulario
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+    
+    // Validar contraseñas
+    const password = $('#password').val();
+    const passwordConfirm = $('#passwordConfirm').val();
+    
+    if (password || passwordConfirm) {
+        if (password !== passwordConfirm) {
+            showToast('Las contraseñas no coinciden', 'error');
+            return;
+        }
+        if (password.length < 8) {
+            showToast('La contraseña debe tener al menos 8 caracteres', 'error');
+            return;
+        }
+    }
+    
+    // Preparar datos
+    const data = {
+        username: $('#username').val(),
+        email: $('#email').val(),
+        first_name: $('#firstName').val(),
+        last_name: $('#lastName').val(),
+        is_staff: $('#isStaff').is(':checked'),
+        is_superuser: $('#isSuperuser').is(':checked'),
+        is_active: $('#isActive').is(':checked'),
+        notify_new_appointment: $('#notifyNew').is(':checked'),
+        notify_reminder: $('#notifyReminder').is(':checked'),
+        allowed_stages: []
+    };
+    
+    if (password) {
+        data.new_password = password;
+        data.password = password;
+    }
+    
+    // Recoger etapas seleccionadas
+    $('input[name="allowed_stages"]:checked').each(function() {
+        data.allowed_stages.push(parseInt($(this).val()));
+    });
+    
+    // Deshabilitar botón
+    const saveBtn = $('#saveUser');
+    const originalText = saveBtn.html();
+    saveBtn.prop('disabled', true).html('<i class="bi bi-hourglass-split me-2"></i>Guardando...');
+    
+    try {
+        const url = editingUserId ? `${API_URL}${editingUserId}/` : API_URL;
+        const method = editingUserId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.error || 'Error al guardar usuario');
+        }
+        
+        showToast(result.message, 'success');
+        bootstrap.Modal.getInstance($('#userModal')).hide();
+        usersTable.ajax.reload();
+        
+    } catch (error) {
+        console.error('Error guardando usuario:', error);
+        showToast(error.message, 'error');
+    } finally {
+        saveBtn.prop('disabled', false).html(originalText);
+    }
+}
+
+async function deleteUser(userId, username) {
+    if (!confirm(`¿Estás seguro de desactivar al usuario "${username}"?\n\nEl usuario no podrá iniciar sesión pero sus datos se conservarán.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}${userId}/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': CSRF_TOKEN
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.error || 'Error al desactivar usuario');
+        }
+        
+        showToast(result.message, 'success');
+        usersTable.ajax.reload();
+        
+    } catch (error) {
+        console.error('Error eliminando usuario:', error);
+        showToast(error.message, 'error');
+    }
+}
+
+function showToast(message, type = 'info') {
+    const bgColors = {
+        'success': 'linear-gradient(135deg, #198754, #157347)',
+        'error': 'linear-gradient(135deg, #dc3545, #bb2d3b)',
+        'info': 'linear-gradient(135deg, #703D80, #5A3166)'
+    };
+    
+    Toastify({
+        text: message,
+        duration: 3000,
+        gravity: 'top',
+        position: 'right',
+        style: {
+            background: bgColors[type] || bgColors['info'],
+            borderRadius: '12px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+        }
+    }).showToast();
+}
+</script>
+{% endblock %}

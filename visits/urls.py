@@ -9,14 +9,16 @@ from .views import (
     DashboardStatsView,
     DashboardCalendarView,
     AppointmentExportView,
-    CancelAppointmentView  # Nuevo import para cancelación
+    CancelAppointmentView,  # Nuevo import para cancelación
+    UserManagementView,  # NUEVO: Gestión de usuarios
+    UserAPIView,  # NUEVO: API de usuarios
 )
 
 urlpatterns = [
     # Autenticación
     path('login/', StaffLoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(
-        next_page='public_booking',
+        next_page='login',  # ← CAMBIADO: ahora va a login
         template_name=None
     ), name='logout'),
     
@@ -57,4 +59,12 @@ urlpatterns = [
     # Staff Profile Management
     path('staff/profile/', StaffProfileView.as_view(), name='staff_profile'),
     path('staff/profile/password/', StaffPasswordChangeView.as_view(), name='staff_password_change'),
+    
+    # ==========================================
+    # NUEVO: Gestión de Usuarios (solo admin)
+    # CAMBIO: Sin 'admin/' para evitar conflicto
+    # ==========================================
+    path('users/', UserManagementView.as_view(), name='user_management'),
+    path('api/users/', UserAPIView.as_view(), name='api_users'),
+    path('api/users/<int:user_id>/', UserAPIView.as_view(), name='api_user_detail'),
 ]
