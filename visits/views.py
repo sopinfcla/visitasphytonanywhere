@@ -1110,6 +1110,9 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             logger.info(f"Deleted appointment: {appointment_id}")
             return JsonResponse({'status': 'success'})
 
+        except Http404:
+            # La cita no existe (probablemente ya fue eliminada)
+            return JsonResponse({'error': 'Cita no encontrada'}, status=404)
         except Exception as e:
             logger.error(f"Error deleting appointment: {str(e)}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)
