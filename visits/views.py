@@ -731,7 +731,11 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             if not is_supervisor:
                 queryset = queryset.filter(staff=request.user.staffprofile)
 
-            search = request.GET.get('search', '').strip()
+            # Total de registros SIN filtros
+            total_records = queryset.count()
+
+            # Aplicar filtros de búsqueda
+            search = request.GET.get('search[value]', '').strip()
             if search:
                 queryset = queryset.filter(
                     Q(visitor_name__icontains=search) |
@@ -741,6 +745,7 @@ class AppointmentAPIView(LoginRequiredMixin, View):
                     Q(course__name__icontains=search)
                 )
 
+            # Aplicar otros filtros
             stage = request.GET.get('stage')
             date = request.GET.get('date')
             status = request.GET.get('status')
@@ -755,7 +760,8 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             if staff_id and is_supervisor and staff_id.isdigit():
                 queryset = queryset.filter(staff_id=staff_id)
 
-            total_records = queryset.count()
+            # Total de registros DESPUÉS de filtros
+            filtered_records = queryset.count()
             
             order_column = request.GET.get('order[0][column]', '0')
             order_dir = request.GET.get('order[0][dir]', 'desc')
@@ -793,7 +799,7 @@ class AppointmentAPIView(LoginRequiredMixin, View):
             return JsonResponse({
                 'draw': int(request.GET.get('draw', 1)),
                 'recordsTotal': total_records,
-                'recordsFiltered': total_records,
+                'recordsFiltered': filtered_records,
                 'data': appointments
             })
 
@@ -1147,6 +1153,10 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             # Verificar si el usuario pertenece al grupo Supervisor
             is_supervisor = self.request.user.groups.filter(name='Supervisor').exists()
             
+            # CORREGIDO: Todos los usuarios (incluidos supervisores) solo ven sus etapas asignadas
+            # Cada staff solo puede crear citas para las etapas donde está autorizado
+            context['all_stages'] = staff_profile.allowed_stages.all()
+            
             # Solo incluir lista de staff para supervisores
             if is_supervisor:
                 context['staff_list'] = StaffProfile.objects.exclude(
@@ -1289,44 +1299,67 @@ class DashboardStatsView(LoginRequiredMixin, View):
             staff_id = request.GET.get('staff_id')
             is_supervisor = request.user.groups.filter(name='Supervisor').exists()
             
+            logger.info(f"DashboardStatsView: user={request.user.username}, staff_id param={staff_id}, is_supervisor={is_supervisor}")
+            
             today = timezone.now()
             today_start = timezone.localtime(today).replace(hour=0, minute=0, second=0)
             today_end = today_start + timedelta(days=1)
             
-            # Determinar el queryset base según los permisos
+            # Determinar el perfil objetivo y queryset base
             base_queryset = Appointment.objects.select_related('stage', 'course', 'staff__user')
+            target_profile = staff_profile  # Por defecto, el usuario actual
+            viewing_all = False  # Flag para saber si está viendo "todas las citas"
             
             if is_supervisor:
                 if staff_id == 'global':
-                    pass  # No filtrar
+                    # Vista global: no filtrar por staff
+                    viewing_all = True
+                    logger.info("Vista global - no filtering by staff")
                 elif staff_id and staff_id.isdigit():
+                    # Vista de un staff específico
                     base_queryset = base_queryset.filter(staff_id=int(staff_id))
+                    try:
+                        target_staff = StaffProfile.objects.get(id=int(staff_id))
+                        target_profile = target_staff
+                        logger.info(f"Vista de staff específico: {target_staff.user.get_full_name()} (ID: {staff_id})")
+                    except StaffProfile.DoesNotExist:
+                        logger.warning(f"StaffProfile {staff_id} no encontrado")
                 else:
+                    # Vista propia del supervisor (sin staff_id o vacío)
                     base_queryset = base_queryset.filter(staff=staff_profile)
+                    logger.info(f"Vista propia del supervisor: {staff_profile.user.get_full_name()}")
             else:
+                # Usuario normal: solo sus citas
                 base_queryset = base_queryset.filter(staff=staff_profile)
+                logger.info(f"Usuario normal: {staff_profile.user.get_full_name()}")
 
-            # Estadísticas
+            # Log del queryset para debug
+            total_appointments = base_queryset.count()
+            logger.info(f"Total appointments in base_queryset: {total_appointments}")
+            
+            # Estadísticas básicas
+            today_count = base_queryset.filter(date__range=(today_start, today_end)).count()
+            confirmed_count = base_queryset.filter(status='completed').count()
+            # CORREGIDO: Contar TODAS las pendientes futuras (no solo de hoy en adelante)
+            pending_count = base_queryset.filter(status='pending', date__gte=today_start).count()
+            
+            logger.info(f"Stats: today={today_count}, confirmed={confirmed_count}, pending={pending_count}")
+            
             stats = {
-                'today_count': base_queryset.filter(
-                    date__range=(today_start, today_end)
-                ).count(),
-                
-                'confirmed_count': base_queryset.filter(
-                    status='completed'
-                ).count(),
-                
-                'pending_count': base_queryset.filter(
-                    status='pending',
-                    date__gte=today_start
-                ).count(),
-                
-                'stages_count': staff_profile.allowed_stages.count() if not is_supervisor else SchoolStage.objects.count()
+                'today_count': today_count,
+                'confirmed_count': confirmed_count,
+                'pending_count': pending_count,
+                'stages_count': SchoolStage.objects.count() if viewing_all else target_profile.allowed_stages.count()
             }
 
-            # Estadísticas por etapa - FORMATO CORREGIDO para dashboard.html
+            # Estadísticas por etapa
             stages_distribution = []
-            stages_queryset = staff_profile.allowed_stages.all() if not is_supervisor else SchoolStage.objects.all()
+            
+            # Etapas a considerar según la vista
+            if viewing_all:
+                stages_queryset = SchoolStage.objects.all()
+            else:
+                stages_queryset = target_profile.allowed_stages.all()
             
             for stage in stages_queryset:
                 stage_count = base_queryset.filter(stage=stage).count()
@@ -1335,8 +1368,10 @@ class DashboardStatsView(LoginRequiredMixin, View):
                         'stage': stage.name,
                         'count': stage_count
                     })
+            
+            logger.info(f"Stages distribution: {stages_distribution}")
 
-            # Horas más populares - FORMATO CORREGIDO
+            # Horas más populares
             popular_hours_query = (
                 base_queryset
                 .filter(date__gte=today_start)
@@ -1355,7 +1390,7 @@ class DashboardStatsView(LoginRequiredMixin, View):
                 } for item in popular_hours_query
             ]
 
-            # Próximas citas - CAMPOS CORREGIDOS con stage__name
+            # Próximas citas
             upcoming = (
                 base_queryset
                 .filter(
@@ -1364,26 +1399,32 @@ class DashboardStatsView(LoginRequiredMixin, View):
                 )
                 .order_by('date')[:5]
             )
+            
+            logger.info(f"Upcoming appointments: {upcoming.count()}")
 
             response_data = {
-                'stages_distribution': stages_distribution,  # NOMBRE CORREGIDO
+                'stages_distribution': stages_distribution,
                 'popular_hours': popular_hours,
                 'upcoming_appointments': [
                     {
                         'id': apt.id,
                         'visitor_name': apt.visitor_name,
-                        'stage__name': apt.stage.name,  # CAMPO AGREGADO para dashboard.html
+                        'stage__name': apt.stage.name,
                         'stage': apt.stage.name,
+                        'course__name': apt.course.name if apt.course else '',
                         'course': apt.course.name if apt.course else '',
                         'date': timezone.localtime(apt.date).isoformat(),
                         'time': timezone.localtime(apt.date).strftime('%H:%M'),
                         'status': apt.status,
                         'staff_name': apt.staff.user.get_full_name(),
-                        'staff_id': apt.staff.id
+                        'staff_id': apt.staff.id,
+                        'student_name': apt.notes.split('Alumno:')[1].split('\n')[0].strip() if apt.notes and 'Alumno:' in apt.notes else ''
                     } for apt in upcoming
                 ],
                 **stats
             }
+            
+            logger.info(f"Returning response with {len(response_data.get('upcoming_appointments', []))} upcoming appointments")
 
             return JsonResponse(response_data)
             

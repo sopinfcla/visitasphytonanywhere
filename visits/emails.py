@@ -252,7 +252,13 @@ def send_staff_daily_reminder(staff_profile, appointments_tomorrow):
         raise
 
 def send_daily_reminders():
-    """Función para enviar todos los recordatorios diarios AL STAFF - llamar desde comando o tarea"""
+    """
+    Función para enviar recordatorios diarios:
+    - A FAMILIAS: 1 email por cita 24h antes
+    - A STAFF: 1 email con todas sus citas del día (solo si notify_reminder=True)
+    
+    Llamar desde comando Django o tarea programada
+    """
     
     try:
         # Calcular mañana
@@ -263,18 +269,47 @@ def send_daily_reminders():
         # Solo importar aquí para evitar import circular
         from .models import Appointment
         
-        # Obtener todas las citas de mañana que no han enviado recordatorio
+        # Obtener todas las citas de mañana pendientes
         appointments_tomorrow = Appointment.objects.filter(
             date__range=(tomorrow_start, tomorrow_end),
-            status='pending',
-            reminder_sent=False
+            status='pending'
         ).select_related('stage', 'course', 'staff__user', 'staff')
         
         if not appointments_tomorrow.exists():
-            logger.info("No hay citas para enviar recordatorios mañana")
-            return 0
+            logger.info("No hay citas para mañana - no se envían recordatorios")
+            return {
+                'staff_emails': 0,
+                'family_emails': 0,
+                'total_appointments': 0
+            }
         
-        # Agrupar por STAFF (no por email del visitante)
+        # ==========================================
+        # PARTE 1: RECORDATORIOS A FAMILIAS
+        # ==========================================
+        family_emails_sent = 0
+        family_emails_failed = 0
+        
+        for appointment in appointments_tomorrow:
+            # Solo enviar si no se ha enviado antes
+            if not appointment.reminder_sent:
+                try:
+                    send_appointment_reminder(appointment)
+                    appointment.reminder_sent = True
+                    appointment.save()
+                    family_emails_sent += 1
+                    logger.info(f"Recordatorio enviado a familia: {appointment.visitor_email}")
+                except Exception as e:
+                    family_emails_failed += 1
+                    logger.error(f"Error enviando recordatorio a familia {appointment.visitor_email}: {str(e)}")
+                    continue
+        
+        logger.info(f"Recordatorios a familias: {family_emails_sent} enviados, {family_emails_failed} fallidos")
+        
+        # ==========================================
+        # PARTE 2: RECORDATORIOS A STAFF
+        # ==========================================
+        
+        # Agrupar citas por STAFF
         appointments_by_staff = {}
         for appointment in appointments_tomorrow:
             staff_id = appointment.staff.id
@@ -285,8 +320,10 @@ def send_daily_reminders():
                 }
             appointments_by_staff[staff_id]['appointments'].append(appointment)
         
-        # Enviar un email por staff con todas sus citas
-        sent_count = 0
+        # Enviar 1 email por staff con todas sus citas
+        staff_emails_sent = 0
+        staff_emails_skipped = 0
+        
         for staff_id, data in appointments_by_staff.items():
             staff_profile = data['staff_profile']
             appointments = data['appointments']
@@ -295,21 +332,29 @@ def send_daily_reminders():
             if staff_profile.notify_reminder:
                 try:
                     send_staff_daily_reminder(staff_profile, appointments)
-                    sent_count += 1
+                    staff_emails_sent += 1
+                    logger.info(f"Recordatorio enviado a staff: {staff_profile.user.email} ({len(appointments)} citas)")
                 except Exception as e:
                     logger.error(f"Error enviando recordatorio al staff {staff_profile.user.email}: {str(e)}")
                     continue
             else:
-                # Marcar como enviado aunque no se envíe por configuración
-                for appointment in appointments:
-                    appointment.reminder_sent = True
-                    appointment.save()
-                logger.info(f"Staff {staff_profile.user.email} tiene recordatorios desactivados - marcando como enviado")
+                staff_emails_skipped += 1
+                logger.info(f"Staff {staff_profile.user.email} tiene recordatorios desactivados - no se envía")
         
-        total_appointments = appointments_tomorrow.count()
-        logger.info(f"Recordatorios procesados: {sent_count} emails enviados para {total_appointments} citas")
-        return sent_count
+        logger.info(f"Recordatorios a staff: {staff_emails_sent} enviados, {staff_emails_skipped} omitidos por configuración")
+        
+        return {
+            'staff_emails': staff_emails_sent,
+            'staff_emails_skipped': staff_emails_skipped,
+            'family_emails': family_emails_sent,
+            'family_emails_failed': family_emails_failed,
+            'total_appointments': appointments_tomorrow.count()
+        }
         
     except Exception as e:
         logger.error(f"Error en send_daily_reminders: {str(e)}", exc_info=True)
-        return 0
+        return {
+            'staff_emails': 0,
+            'family_emails': 0,
+            'error': str(e)
+        }

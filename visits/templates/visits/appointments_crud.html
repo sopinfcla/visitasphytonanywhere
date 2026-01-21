@@ -2,21 +2,199 @@
 {% load static %}
 
 {% block extra_css %}
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <!-- DataTables CSS -->
-<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css"/>
 <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css"/>
 <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css"/>
-<!-- Bootstrap Icons -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 <!-- Toastify CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+
 <style>
+/* Variables del Dashboard */
+:root {
+    --primary-color: #703D80;
+    --primary-dark: #5a2f66;
+    --primary-light: #8a4d9f;
+    --danger-color: #dc3545;
+    --border-radius: 12px;
+    --shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.15);
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Cards */
+.card {
+    border-radius: var(--border-radius);
+    border: none;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+/* Botones */
+.btn-primary {
+    background: var(--primary-color);
+    border: none;
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(112, 61, 128, 0.3);
+}
+
+/* DataTable */
+.table thead th {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+    color: white;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    border: none;
+    padding: 1rem;
+}
+
+.table tbody tr:hover {
+    background: rgba(112, 61, 128, 0.05);
+}
+
+/* Modal (Idéntico al Dashboard) */
+.modal-content {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-lg);
+}
+
+.modal-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+    color: white;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+    padding: 1.5rem;
+}
+
+.modal-header .btn-close {
+    filter: brightness(0) invert(1);
+}
+
+.modal-body {
+    padding: 2rem;
+}
+
+.modal-footer {
+    padding: 1.25rem 1.5rem;
+    background: white;
+    border-top: 1px solid #e9ecef;
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.25rem rgba(112, 61, 128, 0.15);
+}
+
+.btn-save {
+    background: var(--primary-color);
+    border: none;
+    color: white;
+    padding: 0.65rem 1.75rem;
+    font-weight: 600;
+    border-radius: 8px;
+    transition: var(--transition);
+}
+
+.btn-save:hover {
+    background: var(--primary-dark);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(112, 61, 128, 0.3);
+}
+
+.btn-delete {
+    background: var(--danger-color);
+    border: none;
+    color: white;
+    padding: 0.65rem 1.5rem;
+    font-weight: 600;
+    border-radius: 8px;
+    transition: var(--transition);
+}
+
+.btn-delete:hover {
+    background: #b02a37;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+}
+
+.modal-footer .btn-secondary {
+    background: #6c757d;
+    border: none;
+    color: white;
+    padding: 0.65rem 1.5rem;
+    font-weight: 600;
+    border-radius: 8px;
+    transition: var(--transition);
+}
+
+.modal-footer .btn-secondary:hover {
+    background: #5a6268;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+}
+
 .modal-readonly .form-control,
 .modal-readonly .form-select,
 .modal-readonly .btn-save {
     pointer-events: none;
     background-color: #e9ecef;
     opacity: 0.8;
+}
+
+/* Estilos adicionales del JS original */
+.dataTables_processing {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 1em;
+    background: rgba(255,255,255,0.9);
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    z-index: 100;
+    transition: opacity 0.3s;
+}
+
+.dataTables_processing.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.modal-backdrop {
+    z-index: 1040;
+}
+
+.modal {
+    z-index: 1050;
+}
+
+#course-container {
+    transition: all 0.3s ease;
 }
 </style>
 {% endblock %}
@@ -30,18 +208,21 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h4 class="mb-0">Gestión de Citas</h4>
+                            <h4 class="mb-0">
+                                <i class="fas fa-calendar-check me-2" style="color: var(--primary-color);"></i>
+                                Gestión de Citas
+                            </h4>
                             <p class="text-muted mb-0">{{ staff_name }}</p>
                         </div>
                         <div class="d-flex gap-2">
                             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#appointmentModal" onclick="prepareNewAppointment()">
-                                <i class="bi bi-plus-lg"></i> Nueva Cita
+                                <i class="fas fa-plus me-2"></i>Nueva Cita
                             </button>
                             <button type="button" class="btn btn-outline-primary" id="exportPDF">
-                                <i class="bi bi-file-pdf"></i> Exportar PDF
+                                <i class="fas fa-file-pdf me-2"></i>Exportar PDF
                             </button>
                             <button type="button" class="btn btn-outline-success" id="exportExcel">
-                                <i class="bi bi-file-excel"></i> Exportar Excel
+                                <i class="fas fa-file-excel me-2"></i>Exportar Excel
                             </button>
                         </div>
                     </div>
@@ -57,7 +238,9 @@
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-3">
-                            <label for="stage-filter" class="form-label">Etapa</label>
+                            <label for="stage-filter" class="form-label">
+                                <i class="fas fa-graduation-cap me-2"></i>Etapa
+                            </label>
                             <select id="stage-filter" class="form-select">
                                 <option value="">Todas</option>
                                 {% for stage in allowed_stages %}
@@ -66,11 +249,15 @@
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label for="date-filter" class="form-label">Fecha</label>
+                            <label for="date-filter" class="form-label">
+                                <i class="fas fa-calendar me-2"></i>Fecha
+                            </label>
                             <input type="date" id="date-filter" class="form-control" min="{{ today }}" value="">
                         </div>
                         <div class="col-md-3">
-                            <label for="status-filter" class="form-label">Estado</label>
+                            <label for="status-filter" class="form-label">
+                                <i class="fas fa-info-circle me-2"></i>Estado
+                            </label>
                             <select id="status-filter" class="form-select">
                                 <option value="">Todos</option>
                                 <option value="pending">Pendiente</option>
@@ -80,7 +267,7 @@
                         </div>
                         <div class="col-md-3 d-flex align-items-end">
                             <button id="reset-filters" class="btn btn-secondary w-100">
-                                <i class="bi bi-arrow-counterclockwise"></i> Resetear Filtros
+                                <i class="fas fa-redo me-2"></i>Resetear Filtros
                             </button>
                         </div>
                     </div>
@@ -95,15 +282,16 @@
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="appointments-table" class="table table-striped w-100">
+                        <table id="appointments-table" class="table table-hover w-100">
                             <thead>
                                 <tr>
-                                    <th>Fecha</th>
-                                    <th>Hora</th>
-                                    <th>Visitante</th>
-                                    <th>Etapa</th>
-                                    <th>Estado</th>
-                                    <th>Acciones</th>
+                                    <th><i class="fas fa-calendar me-2"></i>Fecha</th>
+                                    <th><i class="fas fa-clock me-2"></i>Hora</th>
+                                    <th><i class="fas fa-user me-2"></i>Visitante</th>
+                                    <th><i class="fas fa-user-tie me-2"></i>Staff</th>
+                                    <th><i class="fas fa-graduation-cap me-2"></i>Etapa</th>
+                                    <th><i class="fas fa-info-circle me-2"></i>Estado</th>
+                                    <th><i class="fas fa-cog me-2"></i>Acciones</th>
                                 </tr>
                             </thead>
                         </table>
@@ -114,109 +302,132 @@
     </div>
 </div>
 
-<!-- Modal Form Unificado -->
+<!-- Modal Form (IDÉNTICO AL DASHBOARD) -->
 <div class="modal fade" id="appointmentModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Gestionar Cita</h5>
+                <h5 class="modal-title">
+                    <i class="fas fa-calendar-plus me-2"></i>Gestionar Cita
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="appointmentForm" novalidate>
                     <input type="hidden" id="appointment_id" name="appointment_id">
                     <input type="hidden" id="appointment_staff_id" name="staff_id">
+                    
                     <!-- Información del Visitante -->
                     <div class="mb-3">
-                        <label for="visitor_name" class="form-label">Nombre del Visitante</label>
+                        <label for="visitor_name" class="form-label">
+                            <i class="fas fa-user me-2"></i>Nombre del Visitante
+                        </label>
                         <input type="text" class="form-control" id="visitor_name" name="visitor_name" required>
                     </div>
                     <div class="mb-3">
-                        <label for="visitor_email" class="form-label">Email</label>
+                        <label for="visitor_email" class="form-label">
+                            <i class="fas fa-envelope me-2"></i>Email
+                        </label>
                         <input type="email" class="form-control" id="visitor_email" name="visitor_email" required>
                     </div>
                     <div class="mb-3">
-                        <label for="visitor_phone" class="form-label">Teléfono</label>
+                        <label for="visitor_phone" class="form-label">
+                            <i class="fas fa-phone me-2"></i>Teléfono
+                        </label>
                         <input type="text" class="form-control" id="visitor_phone" name="visitor_phone" required 
                                maxlength="9" pattern="[0-9]{9}" 
                                oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 9)">
                     </div>
+                    
                     <!-- Etapa y Curso -->
                     <div class="mb-3">
-                        <label for="stage" class="form-label">Etapa</label>
+                        <label for="stage" class="form-label">
+                            <i class="fas fa-graduation-cap me-2"></i>Etapa
+                        </label>
                         <select class="form-select" id="stage" name="stage" required>
                             <option value="">Seleccione una etapa</option>
                             {% for stage in allowed_stages %}
-                            <option value="{{ stage.id }}">{{ stage.name }}</option>
+                                <option value="{{ stage.id }}">{{ stage.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
                     <div class="mb-3" id="course-container" style="display: none;">
-                        <label for="course" class="form-label">Curso</label>
-                        <select class="form-select" id="course" name="course">
-                            <option value="">Seleccione primero una etapa</option>
+                        <label for="course" class="form-label">
+                            <i class="fas fa-book me-2"></i>Curso
+                        </label>
+                        <select class="form-select" id="course" name="course" required>
+                            <option value="">Seleccione un curso</option>
                         </select>
                     </div>
+                    
                     <!-- Fecha y Hora -->
                     <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label for="date" class="form-label">Fecha</label>
-                            <input type="date" class="form-control" id="date" name="date" required min="{{ today }}">
+                        <div class="col-md-6 mb-3">
+                            <label for="date" class="form-label">
+                                <i class="fas fa-calendar me-2"></i>Fecha
+                            </label>
+                            <input type="date" class="form-control" id="date" name="date" required>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label for="time" class="form-label">Hora</label>
+                        <div class="col-md-3 mb-3">
+                            <label for="time" class="form-label">
+                                <i class="fas fa-clock me-2"></i>Hora
+                            </label>
                             <select class="form-select" id="time" name="time" required>
-                                <option value="">Seleccione una hora</option>
+                                <option value="">Hora</option>
                                 {% for hour in available_hours %}
                                     <option value="{{ hour.value }}">{{ hour.label }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label for="duration" class="form-label">Duración</label>
+                        <div class="col-md-3 mb-3">
+                            <label for="duration" class="form-label">
+                                <i class="fas fa-hourglass-half me-2"></i>Duración
+                            </label>
                             <select class="form-select" id="duration" name="duration" required>
-                                <option value="">Seleccione duración</option>
-                                <option value="30">30 minutos</option>
-                                <option value="45">45 minutos</option>
-                                <option value="60">1 hora</option>
+                                <option value="30">30 min</option>
+                                <option value="45">45 min</option>
+                                <option value="60" selected>1 hora</option>
                             </select>
                         </div>
                     </div>
+                    
                     <!-- Estado -->
                     <div class="mb-3">
-                        <label for="status" class="form-label">Estado</label>
+                        <label for="status" class="form-label">
+                            <i class="fas fa-info-circle me-2"></i>Estado
+                        </label>
                         <select class="form-select" id="status" name="status" required>
-                            <option value="">Seleccione un estado</option>
                             <option value="pending">Pendiente</option>
-                            <option value="completed">Realizada</option>
+                            <option value="completed">Completada</option>
                             <option value="cancelled">Cancelada</option>
                         </select>
                     </div>
-                    <!-- Comentarios -->
+                    
+                    <!-- Notas y Comentarios -->
                     <div class="mb-3">
-                        <label for="comments" class="form-label">Comentarios</label>
-                        <textarea class="form-control" id="comments" name="comments" rows="2"></textarea>
+                        <label for="notes" class="form-label">
+                            <i class="fas fa-sticky-note me-2"></i>Notas (privadas)
+                        </label>
+                        <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
                     </div>
-                    <!-- Campos adicionales (siempre visibles en CRUD) -->
-                    <div class="advanced-fields">
-                        <div class="row">
-                            <div class="col-md-8 mb-3">
-                                <label for="notes" class="form-label">Notas del Profesor</label>
-                                <textarea class="form-control" id="notes" name="notes" rows="3" 
-                                          placeholder="Notas internas - no visibles para el visitante"></textarea>
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label for="follow_up_date" class="form-label">Fecha de Seguimiento</label>
-                                <input type="date" class="form-control" id="follow_up_date" name="follow_up_date" 
-                                       min="{{ today }}">
-                            </div>
-                        </div>
+                    <div class="mb-3">
+                        <label for="comments" class="form-label">
+                            <i class="fas fa-comment me-2"></i>Comentarios del visitante
+                        </label>
+                        <textarea class="form-control" id="comments" name="comments" rows="2"></textarea>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary btn-save" id="saveAppointment">Guardar</button>
+                <button type="button" class="btn btn-delete" id="deleteBtn" style="display: none;">
+                    <i class="fas fa-trash me-2"></i>Eliminar
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-save" id="saveAppointment">
+                    <i class="fas fa-save me-2"></i>Guardar
+                </button>
             </div>
         </div>
     </div>
@@ -234,7 +445,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-<!-- DataTables y Plugins -->
+<!-- DataTables -->
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
@@ -244,23 +455,601 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 
-<!-- Global Configuration -->
+<!-- JavaScript INTEGRADO (como en dashboard) -->
 <script>
-    window.APPOINTMENTS_CONFIG = {
-        apiUrl: '{% url "api_appointments" %}',
-        csrfToken: '{{ csrf_token }}',
-        staffId: '{{ request.user.staffprofile.id }}',
-        isAdvancedMode: true // Para mostrar campos adicionales
+// ====================================
+// Config
+// ====================================
+window.APPOINTMENTS_CONFIG = {
+    apiUrl: '{% url "api_appointments" %}',
+    csrfToken: '{{ csrf_token }}',
+    staffId: '{{ request.user.staffprofile.id }}'
+};
+
+const ESTADO_LABELS = {
+    'pending': { class: 'bg-warning', text: 'Pendiente' },
+    'completed': { class: 'bg-success', text: 'Realizada' },
+    'cancelled': { class: 'bg-danger', text: 'Cancelada' }
+};
+
+let appointmentsTable;
+let searchTimeout;
+let currentXhr;
+
+// ====================================
+// Initialization
+// ====================================
+$(document).ready(function() {
+    console.log('Initializing appointments CRUD...');
+    
+    if ($('#appointments-table').length) {
+        initializeDataTable();
+    }
+    
+    initializeEventListeners();
+    initializeValidation();
+    
+    // Event listener para cargar cursos (como en dashboard)
+    document.getElementById('stage')?.addEventListener('change', (e) => loadCourses(e.target.value));
+});
+
+// ====================================
+// DataTable Configuration (SIN CAMBIOS - mantiene funcionalidad original)
+// ====================================
+function initializeDataTable() {
+    console.log('Setting up DataTable...');
+    
+    if ($.fn.DataTable.isDataTable('#appointments-table')) {
+        $('#appointments-table').DataTable().destroy();
+    }
+    
+    appointmentsTable = $('#appointments-table').DataTable({
+        serverSide: true,
+        processing: true,
+        responsive: true,
+        searching: true,
+        search: {
+            smart: true,
+            regex: true,
+            caseInsensitive: true
+        },
+        ajax: {
+            url: window.APPOINTMENTS_CONFIG.apiUrl,
+            type: 'GET',
+            beforeSend: function(jqXHR) {
+                if (currentXhr) {
+                    currentXhr.abort();
+                }
+                currentXhr = jqXHR;
+            },
+            data: function(d) {
+                const filters = {
+                    draw: d.draw,
+                    start: d.start,
+                    length: d.length,
+                    order: [{
+                        column: d.order[0].column,
+                        dir: d.order[0].dir
+                    }],
+                    search: { value: d.search.value }
+                };
+                
+                // Filtros adicionales
+                const stageFilter = $('#stage-filter').val();
+                const dateFilter = $('#date-filter').val();
+                const statusFilter = $('#status-filter').val();
+                
+                if (stageFilter) filters.stage = stageFilter;
+                if (dateFilter) filters.date = dateFilter;
+                if (statusFilter) filters.status = statusFilter;
+                
+                return filters;
+            },
+            dataSrc: function(json) {
+                return json.data || [];
+            },
+            error: function(xhr, error, thrown) {
+                console.error('DataTable Error:', error, thrown);
+                Toastify({
+                    text: 'Error cargando las citas',
+                    duration: 3000,
+                    gravity: 'top',
+                    position: 'right',
+                    style: { background: 'linear-gradient(to right, #ff5f6d, #ffc371)' }
+                }).showToast();
+            }
+        },
+        columns: [
+            {
+                data: 'date',
+                orderable: true,
+                searchable: true,
+                render: function (data) {
+                    const formattedDate = moment(data).format('DD/MM/YYYY');
+                    return `<span data-search="${formattedDate}">${formattedDate}</span>`;
+                }
+            },
+            { 
+                data: 'date',
+                orderable: true,
+                searchable: true,
+                render: function (data) {
+                    const formattedTime = moment(data).format('HH:mm');
+                    return `<span data-search="${formattedTime}">${formattedTime}</span>`;
+                }
+            },
+            { 
+                data: 'visitor_name',
+                orderable: true,
+                searchable: true,
+                render: function (data, type, row) {
+                    return `
+                        <div>
+                            <div class="fw-bold">${data || ''}</div>
+                            <small class="text-muted">${row.visitor_email || ''}</small>
+                        </div>
+                    `;
+                }
+            },
+            // COLUMNA STAFF AÑADIDA
+            {
+                data: 'staff_name',
+                orderable: true,
+                searchable: true,
+                render: function(data) {
+                    return `<span class="badge bg-info">${data || 'Sin asignar'}</span>`;
+                }
+            },
+            { 
+                data: 'stage_name', 
+                orderable: true,
+                searchable: true,
+                render: function (data, type, row) {
+                    let html = `<div><strong>${data}</strong>`;
+                    if (row.course_name) {
+                        html += `<br><small class="text-muted">${row.course_name}</small>`;
+                    }
+                    html += '</div>';
+                    return html;
+                }
+            },
+            { 
+                data: 'status',
+                orderable: true,
+                searchable: true,
+                render: function (data) {
+                    const status = ESTADO_LABELS[data] || { class: 'bg-secondary', text: data || 'N/A' };
+                    return `<span class="badge ${status.class}" data-search="${status.text}">${status.text}</span>`;
+                }
+            },
+            { 
+                data: 'id',
+                orderable: false,
+                searchable: false,
+                render: function (data) {
+                    return `
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary edit-appointment" data-id="${data}" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-outline-info download-pdf" data-id="${data}" title="Descargar PDF">
+                                <i class="fas fa-file-pdf"></i>
+                            </button>
+                            <button class="btn btn-outline-danger delete-appointment" data-id="${data}" title="Eliminar">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    `;
+                }
+            }
+        ],
+        columnDefs: [
+            {
+                targets: [0, 1, 2, 3, 4, 5], // Columnas donde SÍ buscar (fecha, hora, visitante, staff, etapa, estado)
+                searchable: true
+            },
+            {
+                targets: [6], // Columna de acciones (NO buscar aquí)
+                searchable: false
+            }
+        ],
+        language: {
+            processing: "Procesando...",
+            search: "Buscar:",
+            lengthMenu: "Mostrar _MENU_ registros",
+            info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+            infoEmpty: "Mostrando 0 a 0 de 0 registros",
+            infoFiltered: "(filtrado de _MAX_ registros totales)",
+            loadingRecords: "Cargando...",
+            zeroRecords: "No se encontraron registros",
+            emptyTable: "No hay citas disponibles",
+            paginate: {
+                first: "Primero",
+                previous: "Anterior",
+                next: "Siguiente",
+                last: "Último"
+            }
+        },
+        order: [[0, 'desc'], [1, 'desc']]
+    });
+
+    // Mejorar búsqueda
+    $('.dataTables_filter input').off().on('input', function() {
+        const searchValue = this.value;
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            appointmentsTable.search(searchValue).draw();
+        }, 500);
+    });
+}
+
+// ====================================
+// Event Listeners (SIN CAMBIOS)
+// ====================================
+function initializeEventListeners() {
+    // Filtros
+    $('#stage-filter, #date-filter, #status-filter').on('change', function() {
+        if (appointmentsTable) {
+            appointmentsTable.ajax.reload();
+        }
+    });
+    
+    $('#reset-filters').on('click', function() {
+        $('#stage-filter').val('');
+        $('#date-filter').val('');
+        $('#status-filter').val('');
+        if (appointmentsTable) {
+            appointmentsTable.ajax.reload();
+        }
+    });
+    
+    // Edit appointment
+    $(document).on('click', '.edit-appointment', function() {
+        const id = $(this).data('id');
+        loadAppointment(id);
+    });
+    
+    // Delete appointment
+    $(document).on('click', '.delete-appointment', function() {
+        const id = $(this).data('id');
+        if (confirm('¿Está seguro de que desea eliminar esta cita?')) {
+            deleteAppointment(id);
+        }
+    });
+    
+    // Download PDF
+    $(document).on('click', '.download-pdf', function() {
+        const id = $(this).data('id');
+        window.open(`/api/appointments/${id}/export/`, '_blank');
+    });
+    
+    // Save appointment
+    $('#saveAppointment').on('click', saveAppointment);
+    
+    // Export buttons
+    $('#exportPDF').on('click', exportPDF);
+    $('#exportExcel').on('click', exportExcel);
+}
+
+// ====================================
+// Validation (SIN CAMBIOS)
+// ====================================
+function initializeValidation() {
+    $('#appointmentForm').validate({
+        rules: {
+            visitor_name: { required: true },
+            visitor_email: { required: true, email: true },
+            visitor_phone: { required: true, digits: true, minlength: 9, maxlength: 9 },
+            stage: { required: true },
+            course: { required: true },
+            date: { required: true },
+            time: { required: true },
+            duration: { required: true },
+            status: { required: true }
+        },
+        messages: {
+            visitor_name: 'Este campo es obligatorio',
+            visitor_email: 'Ingrese un email válido',
+            visitor_phone: 'Ingrese un teléfono válido de 9 dígitos',
+            stage: 'Seleccione una etapa',
+            course: 'Seleccione un curso',
+            date: 'Seleccione una fecha',
+            time: 'Seleccione una hora',
+            duration: 'Seleccione una duración',
+            status: 'Seleccione un estado'
+        }
+    });
+}
+
+// ====================================
+// Función loadCourses (COMO EN DASHBOARD)
+// ====================================
+async function loadCourses(stageId) {
+    const courseSelect = document.getElementById('course');
+    const courseContainer = document.getElementById('course-container');
+    
+    // Validación robusta
+    if (typeof stageId === 'object' && stageId !== null) {
+        stageId = stageId.target ? stageId.target.value : '';
+    }
+    
+    if (!stageId || stageId === '' || stageId === 'undefined' || stageId === 'null') {
+        courseContainer.style.display = 'none';
+        return;
+    }
+    
+    try {
+        const url = `/api/stage/${stageId}/courses/`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`Error al cargar cursos: ${response.status}`);
+        }
+        
+        const courses = await response.json();
+        
+        courseSelect.innerHTML = '<option value="">Seleccione un curso</option>';
+        courses.forEach(course => {
+            courseSelect.innerHTML += `<option value="${course.id}">${course.name}</option>`;
+        });
+        
+        courseContainer.style.display = 'block';
+    } catch (error) {
+        console.error('Error in loadCourses:', error);
+        courseContainer.style.display = 'none';
+    }
+}
+
+// ====================================
+// CRUD Operations (SIN CAMBIOS)
+// ====================================
+async function loadAppointment(id) {
+    try {
+        const response = await fetch(`${window.APPOINTMENTS_CONFIG.apiUrl}${id}/`);
+        if (!response.ok) throw new Error('Error al cargar la cita');
+        
+        const appointment = await response.json();
+        
+        document.getElementById('appointment_id').value = appointment.id || '';
+        document.getElementById('appointment_staff_id').value = appointment.staff || '';
+        document.getElementById('visitor_name').value = appointment.visitor_name || '';
+        document.getElementById('visitor_email').value = appointment.visitor_email || '';
+        document.getElementById('visitor_phone').value = appointment.visitor_phone || '';
+        document.getElementById('stage').value = appointment.stage || '';
+        
+        if (appointment.stage) {
+            await loadCourses(appointment.stage);
+            if (appointment.course) {
+                document.getElementById('course').value = appointment.course;
+            }
+        }
+        
+        if (appointment.date) {
+            const appointmentDate = new Date(appointment.date);
+            document.getElementById('date').value = appointmentDate.toISOString().split('T')[0];
+            document.getElementById('time').value = appointmentDate.toTimeString().slice(0,5);
+        }
+        
+        document.getElementById('duration').value = appointment.duration || 60;
+        document.getElementById('status').value = appointment.status || 'pending';
+        document.getElementById('notes').value = appointment.notes || '';
+        document.getElementById('comments').value = appointment.comments || '';
+        
+        document.getElementById('deleteBtn').style.display = 'block';
+        
+        new bootstrap.Modal(document.getElementById('appointmentModal')).show();
+        
+    } catch (error) {
+        console.error('Error:', error);
+        Toastify({
+            text: 'Error al cargar la cita',
+            duration: 3000,
+            gravity: 'top',
+            position: 'right',
+            style: { background: 'linear-gradient(to right, #ff5f6d, #ffc371)' }
+        }).showToast();
+    }
+}
+
+async function saveAppointment() {
+    const form = document.getElementById('appointmentForm');
+    if (!$(form).valid()) return;
+    
+    const appointmentId = document.getElementById('appointment_id').value;
+    const staffId = document.getElementById('appointment_staff_id').value;
+    
+    // Validación de curso obligatorio
+    const courseValue = document.getElementById('course').value;
+    if (!courseValue || courseValue === '') {
+        Toastify({
+            text: 'Debe seleccionar un curso',
+            duration: 3000,
+            gravity: 'top',
+            position: 'right',
+            style: { background: 'linear-gradient(to right, #ff5f6d, #ffc371)' }
+        }).showToast();
+        return;
+    }
+    
+    const data = {
+        staff: staffId,
+        visitor_name: document.getElementById('visitor_name').value,
+        visitor_email: document.getElementById('visitor_email').value,
+        visitor_phone: document.getElementById('visitor_phone').value,
+        stage: document.getElementById('stage').value,
+        course: courseValue,
+        duration: parseInt(document.getElementById('duration').value),
+        status: document.getElementById('status').value,
+        notes: document.getElementById('notes').value || '',
+        comments: document.getElementById('comments').value || ''
     };
     
-    function prepareNewAppointment() {
-        // Mostrar campos avanzados en modo CRUD
-        document.querySelector('.advanced-fields').style.display = 'block';
-        // Limpiar formulario
-        cleanupModal();
+    const date = document.getElementById('date').value;
+    const time = document.getElementById('time').value;
+    data.date = `${date}T${time}:00`;
+    
+    try {
+        const url = appointmentId 
+            ? `${window.APPOINTMENTS_CONFIG.apiUrl}${appointmentId}/`
+            : window.APPOINTMENTS_CONFIG.apiUrl;
+        
+        const method = appointmentId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': window.APPOINTMENTS_CONFIG.csrfToken
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.error || 'Error al guardar la cita');
+        }
+        
+        Toastify({
+            text: 'Cita guardada correctamente',
+            duration: 3000,
+            gravity: 'top',
+            position: 'right',
+            style: { background: 'linear-gradient(to right, #00b09b, #96c93d)' }
+        }).showToast();
+        
+        bootstrap.Modal.getInstance(document.getElementById('appointmentModal')).hide();
+        appointmentsTable.ajax.reload();
+        
+    } catch (error) {
+        console.error('Error:', error);
+        Toastify({
+            text: error.message,
+            duration: 3000,
+            gravity: 'top',
+            position: 'right',
+            style: { background: 'linear-gradient(to right, #ff5f6d, #ffc371)' }
+        }).showToast();
     }
-</script>
+}
 
-<!-- Application Code -->
-<script src="{% static 'visits/js/appointments_crud.js' %}"></script>
+async function deleteAppointment(id) {
+    try {
+        const response = await fetch(`${window.APPOINTMENTS_CONFIG.apiUrl}${id}/`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': window.APPOINTMENTS_CONFIG.csrfToken }
+        });
+        
+        if (!response.ok) throw new Error('Error al eliminar la cita');
+        
+        Toastify({
+            text: 'Cita eliminada correctamente',
+            duration: 3000,
+            gravity: 'top',
+            position: 'right',
+            style: { background: 'linear-gradient(to right, #00b09b, #96c93d)' }
+        }).showToast();
+        
+        const modal = bootstrap.Modal.getInstance(document.getElementById('appointmentModal'));
+        if (modal) modal.hide();
+        
+        appointmentsTable.ajax.reload();
+        
+    } catch (error) {
+        console.error('Error:', error);
+        Toastify({
+            text: 'Error al eliminar la cita',
+            duration: 3000,
+            gravity: 'top',
+            position: 'right',
+            style: { background: 'linear-gradient(to right, #ff5f6d, #ffc371)' }
+        }).showToast();
+    }
+}
+
+// ====================================
+// Export Functions (SIN CAMBIOS)
+// ====================================
+function exportPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    doc.text('Lista de Citas', 14, 15);
+    
+    const tableData = appointmentsTable.rows({ search: 'applied' }).data().toArray();
+    
+    const rows = tableData.map(row => [
+        moment(row.date).format('DD/MM/YYYY'),
+        moment(row.date).format('HH:mm'),
+        row.visitor_name,
+        row.staff_name || '-',
+        row.stage_name,
+        ESTADO_LABELS[row.status]?.text || row.status
+    ]);
+    
+    doc.autoTable({
+        head: [['Fecha', 'Hora', 'Visitante', 'Staff', 'Etapa', 'Estado']],
+        body: rows,
+        startY: 20
+    });
+    
+    doc.save('citas.pdf');
+    
+    Toastify({
+        text: 'PDF exportado correctamente',
+        duration: 3000,
+        gravity: 'top',
+        position: 'right',
+        style: { background: 'linear-gradient(to right, #00b09b, #96c93d)' }
+    }).showToast();
+}
+
+function exportExcel() {
+    const tableData = appointmentsTable.rows({ search: 'applied' }).data().toArray();
+    
+    const data = tableData.map(row => ({
+        'Fecha': moment(row.date).format('DD/MM/YYYY'),
+        'Hora': moment(row.date).format('HH:mm'),
+        'Visitante': row.visitor_name,
+        'Email': row.visitor_email,
+        'Teléfono': row.visitor_phone,
+        'Staff': row.staff_name || '-',
+        'Etapa': row.stage_name,
+        'Curso': row.course_name || '-',
+        'Estado': ESTADO_LABELS[row.status]?.text || row.status,
+        'Duración': row.duration + ' min'
+    }));
+    
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Citas');
+    
+    XLSX.writeFile(wb, 'citas.xlsx');
+    
+    Toastify({
+        text: 'Excel exportado correctamente',
+        duration: 3000,
+        gravity: 'top',
+        position: 'right',
+        style: { background: 'linear-gradient(to right, #00b09b, #96c93d)' }
+    }).showToast();
+}
+
+// ====================================
+// Helper Functions
+// ====================================
+function prepareNewAppointment() {
+    document.getElementById('appointmentForm').reset();
+    document.getElementById('appointment_id').value = '';
+    document.getElementById('appointment_staff_id').value = '{{ request.user.staffprofile.id }}';
+    document.getElementById('course-container').style.display = 'none';
+    document.getElementById('deleteBtn').style.display = 'none';
+    
+    const modalEl = document.getElementById('appointmentModal');
+    modalEl.classList.remove('modal-readonly');
+    modalEl.querySelectorAll('input, select, textarea').forEach(field => {
+        field.disabled = false;
+    });
+}
+</script>
 {% endblock %}

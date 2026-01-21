@@ -20,10 +20,33 @@
                     <i class="fas fa-map-marker-alt me-2 mt-1"></i>
                     <span class="fs-6">Avenida Padre Claret, 3<br>Segovia</span>
                 </div>
+                {% if stage.name == "Escuela Infantil" %}
                 <div class="d-flex align-items-center text-secondary mb-2">
                     <i class="fas fa-phone me-2"></i>
-                    <span class="fs-6">921 42 03 00</span>
+                    <a href="tel:+34921438637" class="text-decoration-none text-secondary">
+                        <span class="fs-6">921 43 86 37</span>
+                    </a>
                 </div>
+                <div class="d-flex align-items-center text-secondary mb-2">
+                    <i class="fas fa-phone me-2"></i>
+                    <a href="tel:+34608261374" class="text-decoration-none text-secondary">
+                        <span class="fs-6">608 26 13 74</span>
+                    </a>
+                </div>
+                {% else %}
+                <div class="d-flex align-items-center text-secondary mb-2">
+                    <i class="fas fa-phone me-2"></i>
+                    <a href="tel:+34921420300" class="text-decoration-none text-secondary">
+                        <span class="fs-6">921 42 03 00</span>
+                    </a>
+                </div>
+                <div class="d-flex align-items-center text-secondary mb-2">
+                    <i class="fab fa-whatsapp me-2" style="color: #25D366;"></i>
+                    <a href="https://wa.me/34644226286" target="_blank" rel="noopener" class="text-decoration-none" style="color: #25D366;">
+                        <span class="fs-6">644 22 62 86</span>
+                    </a>
+                </div>
+                {% endif %}
                 <div class="d-flex align-items-center text-secondary">
                     <i class="fas fa-envelope me-2"></i>
                     <span class="fs-6">colegio@claret.es</span>
@@ -77,9 +100,25 @@
                                     <h6 class="alert-heading mb-2">Contacta con nosotros</h6>
                                     <p class="mb-2">Para concertar una cita personalizada:</p>
                                     <div class="small">
+                                        {% if stage.name == "Escuela Infantil" %}
                                         <div class="mb-1">
-                                            <strong>Teléfono:</strong> 921 42 03 00
+                                            <strong>Teléfono:</strong> 
+                                            <a href="tel:+34921438637" class="text-decoration-none">921 43 86 37</a>
                                         </div>
+                                        <div class="mb-1">
+                                            <strong>Teléfono:</strong> 
+                                            <a href="tel:+34608261374" class="text-decoration-none">608 26 13 74</a>
+                                        </div>
+                                        {% else %}
+                                        <div class="mb-1">
+                                            <strong>Teléfono:</strong> 
+                                            <a href="tel:+34921420300" class="text-decoration-none">921 42 03 00</a>
+                                        </div>
+                                        <div class="mb-1">
+                                            <strong>WhatsApp:</strong> 
+                                            <a href="https://wa.me/34644226286" target="_blank" rel="noopener" class="text-decoration-none" style="color: #25D366;">644 22 62 86</a>
+                                        </div>
+                                        {% endif %}
                                         <div>
                                             <strong>Email:</strong> colegio@claret.es
                                         </div>

@@ -128,8 +128,8 @@ body {
 
 .stat-card {
     background: white;
-    border-radius: var(--border-radius);
-    padding: 1.75rem;
+    border-radius: 12px;
+    padding: 1.25rem;
     box-shadow: var(--shadow-sm);
     transition: var(--transition);
     border: 2px solid transparent;
@@ -143,13 +143,13 @@ body {
     top: 0;
     left: 0;
     width: 100%;
-    height: 4px;
+    height: 3px;
     background: linear-gradient(90deg, var(--card-color), var(--card-color-light));
 }
 
 .stat-card:hover {
-    transform: translateY(-8px);
-    box-shadow: var(--shadow-lg);
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
     border-color: var(--card-color);
 }
 
@@ -174,33 +174,33 @@ body {
 }
 
 .stat-icon {
-    width: 64px;
-    height: 64px;
-    border-radius: 16px;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
     background: linear-gradient(135deg, var(--card-color), var(--card-color-light));
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.12);
 }
 
 .stat-icon i {
-    font-size: 1.75rem;
+    font-size: 1.4rem;
     color: white;
 }
 
 .stat-label {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     color: #6c757d;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.4rem;
 }
 
 .stat-value {
-    font-size: 2.5rem;
+    font-size: 2rem;
     font-weight: 700;
     color: #1a1a2e;
     line-height: 1;
@@ -449,14 +449,31 @@ body {
     border-radius: 20px;
     font-weight: 700;
     font-size: 0.85rem;
-    margin-bottom: 0.75rem;
+}
+
+.appointment-date {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(243, 191, 77, 0.15);
+    color: #c9941c;
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: capitalize;
 }
 
 .appointment-visitor {
     font-weight: 700;
     font-size: 1.05rem;
     color: #1a1a2e;
-    margin-bottom: 0.5rem;
+}
+
+.appointment-student {
+    font-size: 0.95rem;
+    color: #495057;
+    font-weight: 600;
 }
 
 .appointment-stage {
@@ -542,9 +559,13 @@ body {
 }
 
 .modal-footer {
-    padding: 1.5rem 2rem;
-    background: #f8f9fa;
+    padding: 1.25rem 1.5rem;
+    background: white;
+    border-top: 1px solid #e9ecef;
     border-radius: 0 0 var(--border-radius) var(--border-radius);
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
 }
 
 .form-label {
@@ -562,7 +583,8 @@ body {
 .btn-save {
     background: var(--primary-color);
     border: none;
-    padding: 0.75rem 2rem;
+    color: white;
+    padding: 0.65rem 1.75rem;
     font-weight: 600;
     border-radius: 8px;
     transition: var(--transition);
@@ -570,6 +592,7 @@ body {
 
 .btn-save:hover {
     background: var(--primary-dark);
+    color: white;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(112, 61, 128, 0.3);
 }
@@ -577,7 +600,8 @@ body {
 .btn-delete {
     background: var(--danger-color);
     border: none;
-    padding: 0.75rem 1.5rem;
+    color: white;
+    padding: 0.65rem 1.5rem;
     font-weight: 600;
     border-radius: 8px;
     transition: var(--transition);
@@ -585,8 +609,26 @@ body {
 
 .btn-delete:hover {
     background: #b02a37;
+    color: white;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+}
+
+.modal-footer .btn-secondary {
+    background: #6c757d;
+    border: none;
+    color: white;
+    padding: 0.65rem 1.5rem;
+    font-weight: 600;
+    border-radius: 8px;
+    transition: var(--transition);
+}
+
+.modal-footer .btn-secondary:hover {
+    background: #5a6268;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
 }
 
 /* Modal readonly */
@@ -854,7 +896,7 @@ body {
                         </label>
                         <select class="form-select" id="stage" name="stage" required>
                             <option value="">Seleccione una etapa</option>
-                            {% for stage in user.staffprofile.allowed_stages.all %}
+                            {% for stage in all_stages %}
                                 <option value="{{ stage.id }}">{{ stage.name }}</option>
                             {% endfor %}
                         </select>
@@ -863,7 +905,7 @@ body {
                         <label for="course" class="form-label">
                             <i class="fas fa-book me-2"></i>Curso
                         </label>
-                        <select class="form-select" id="course" name="course">
+                        <select class="form-select" id="course" name="course" required>
                             <option value="">Seleccione primero una etapa</option>
                         </select>
                     </div>
@@ -1140,7 +1182,25 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (isSupervisor) {
         document.getElementById('viewSelector')?.addEventListener('change', function() {
-            currentView = this.value;
+            const newView = this.value;
+            console.log('View changed to:', newView);
+            
+            // Limpiar estadísticas antes de cargar
+            updateStats({
+                today_count: '-',
+                confirmed_count: '-',
+                pending_count: '-',
+                stages_count: '-'
+            });
+            
+            // Limpiar gráficos
+            if (stagesChart) stagesChart.destroy();
+            if (hoursChart) hoursChart.destroy();
+            
+            // Actualizar vista actual
+            currentView = newView;
+            
+            // Cargar nuevos datos
             loadDashboardData();
             calendar?.refetchEvents();
         });
@@ -1149,7 +1209,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Modal handlers
     document.getElementById('saveBtn')?.addEventListener('click', saveAppointment);
     document.getElementById('deleteBtn')?.addEventListener('click', deleteAppointment);
-    document.getElementById('stage')?.addEventListener('change', loadCourses);
+    document.getElementById('stage')?.addEventListener('change', (e) => loadCourses(e.target.value));
 });
 
 // Funciones de carga de datos
@@ -1161,6 +1221,8 @@ async function loadDashboardData() {
         }
         
         const url = `{% url "dashboard_stats" %}${params.toString() ? '?' + params.toString() : ''}`;
+        console.log('=== loadDashboardData ===');
+        console.log('currentView:', currentView);
         console.log('Fetching dashboard data from:', url);
         
         const response = await fetch(url);
@@ -1178,6 +1240,12 @@ async function loadDashboardData() {
         
         const data = await response.json();
         console.log('Dashboard data received:', data);
+        console.log('  - today_count:', data.today_count);
+        console.log('  - confirmed_count:', data.confirmed_count);
+        console.log('  - pending_count:', data.pending_count);
+        console.log('  - stages_count:', data.stages_count);
+        console.log('  - stages_distribution:', data.stages_distribution);
+        console.log('  - upcoming_appointments:', data.upcoming_appointments);
         
         if (!data || typeof data !== 'object') {
             throw new Error('Datos inválidos recibidos del servidor');
@@ -1216,6 +1284,8 @@ function updateCharts(data) {
         // Validar que existan datos
         const stagesData = data.stages_distribution || [];
         
+        console.log('Stages data:', stagesData);  // Debug
+        
         if (stagesData.length > 0) {
             stagesChart = new Chart(stagesCtx, {
                 type: 'doughnut',
@@ -1224,13 +1294,15 @@ function updateCharts(data) {
                     datasets: [{
                         data: stagesData.map(s => s.count),
                         backgroundColor: [
-                            'rgba(112, 61, 128, 0.8)',
-                            'rgba(25, 135, 84, 0.8)',
-                            'rgba(255, 193, 7, 0.8)',
-                            'rgba(13, 202, 240, 0.8)',
-                            'rgba(220, 53, 69, 0.8)'
+                            'rgba(112, 61, 128, 0.85)',
+                            'rgba(25, 135, 84, 0.85)',
+                            'rgba(255, 193, 7, 0.85)',
+                            'rgba(13, 202, 240, 0.85)',
+                            'rgba(220, 53, 69, 0.85)',
+                            'rgba(243, 191, 77, 0.85)'
                         ],
-                        borderWidth: 0
+                        borderWidth: 0,
+                        hoverOffset: 8
                     }]
                 },
                 options: {
@@ -1240,10 +1312,29 @@ function updateCharts(data) {
                         legend: {
                             position: 'bottom',
                             labels: {
-                                padding: 15,
+                                padding: 12,
                                 font: {
-                                    size: 12,
-                                    weight: '600'
+                                    size: 11,
+                                    weight: '600',
+                                    family: 'Poppins'
+                                },
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: {
+                                size: 13,
+                                weight: '600'
+                            },
+                            bodyFont: {
+                                size: 12
+                            },
+                            callbacks: {
+                                label: function(context) {
+                                    return context.label + ': ' + context.parsed + ' citas';
                                 }
                             }
                         }
@@ -1252,7 +1343,8 @@ function updateCharts(data) {
             });
         } else {
             // Mostrar mensaje de "sin datos"
-            stagesCtx.parentElement.innerHTML = '<div class="text-center py-5 text-muted"><i class="fas fa-chart-pie fa-3x mb-3 opacity-25"></i><p>No hay datos disponibles</p></div>';
+            const parent = stagesCtx.parentElement;
+            parent.innerHTML = '<div class="text-center py-5 text-muted"><i class="fas fa-chart-pie fa-3x mb-3 opacity-25"></i><p>No hay datos disponibles</p></div>';
         }
     }
     
@@ -1264,6 +1356,8 @@ function updateCharts(data) {
         // Validar que existan datos
         const hoursData = data.popular_hours || [];
         
+        console.log('Hours data:', hoursData);  // Debug
+        
         if (hoursData.length > 0) {
             hoursChart = new Chart(hoursCtx, {
                 type: 'bar',
@@ -1272,7 +1366,7 @@ function updateCharts(data) {
                     datasets: [{
                         label: 'Citas',
                         data: hoursData.map(h => h.count),
-                        backgroundColor: 'rgba(112, 61, 128, 0.8)',
+                        backgroundColor: 'rgba(112, 61, 128, 0.85)',
                         borderRadius: 8,
                         borderSkipped: false
                     }]
@@ -1283,6 +1377,17 @@ function updateCharts(data) {
                     plugins: {
                         legend: {
                             display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: {
+                                size: 13,
+                                weight: '600'
+                            },
+                            bodyFont: {
+                                size: 12
+                            }
                         }
                     },
                     scales: {
@@ -1291,8 +1396,9 @@ function updateCharts(data) {
                             ticks: {
                                 stepSize: 1,
                                 font: {
-                                    size: 12,
-                                    weight: '600'
+                                    size: 11,
+                                    weight: '600',
+                                    family: 'Poppins'
                                 }
                             },
                             grid: {
@@ -1302,8 +1408,9 @@ function updateCharts(data) {
                         x: {
                             ticks: {
                                 font: {
-                                    size: 11,
-                                    weight: '600'
+                                    size: 10,
+                                    weight: '600',
+                                    family: 'Poppins'
                                 }
                             },
                             grid: {
@@ -1315,7 +1422,8 @@ function updateCharts(data) {
             });
         } else {
             // Mostrar mensaje de "sin datos"
-            hoursCtx.parentElement.innerHTML = '<div class="text-center py-5 text-muted"><i class="fas fa-chart-bar fa-3x mb-3 opacity-25"></i><p>No hay datos disponibles</p></div>';
+            const parent = hoursCtx.parentElement;
+            parent.innerHTML = '<div class="text-center py-5 text-muted"><i class="fas fa-chart-bar fa-3x mb-3 opacity-25"></i><p>No hay datos disponibles</p></div>';
         }
     }
 }
@@ -1335,21 +1443,51 @@ function updateUpcomingAppointments(appointments) {
         return;
     }
     
-    container.innerHTML = appointments.map(apt => `
-        <div class="appointment-item" onclick="loadAppointment(${apt.id}, ${apt.staff_id})">
-            <div class="appointment-time">
-                <i class="fas fa-clock"></i>
-                ${new Date(apt.date).toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'})}
+    container.innerHTML = appointments.map(apt => {
+        const aptDate = new Date(apt.date);
+        const dateStr = aptDate.toLocaleDateString('es-ES', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short'
+        });
+        const timeStr = aptDate.toLocaleTimeString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        // Construir etapa y curso
+        let stageInfo = apt.stage__name || '';
+        if (apt.course__name) {
+            stageInfo += ` - ${apt.course__name}`;
+        }
+        
+        return `
+            <div class="appointment-item" onclick="loadAppointment(${apt.id}, ${apt.staff_id})">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="appointment-date">
+                        <i class="fas fa-calendar-day me-1"></i>
+                        ${dateStr}
+                    </div>
+                    <div class="appointment-time">
+                        <i class="fas fa-clock me-1"></i>
+                        ${timeStr}
+                    </div>
+                </div>
+                <div class="appointment-visitor mb-1">
+                    <i class="fas fa-user me-2"></i>${apt.visitor_name}
+                </div>
+                ${apt.student_name ? `
+                <div class="appointment-student mb-1">
+                    <i class="fas fa-user-graduate me-2"></i>${apt.student_name}
+                </div>
+                ` : ''}
+                <div class="appointment-stage">
+                    <i class="fas fa-graduation-cap me-1"></i>
+                    ${stageInfo}
+                </div>
             </div>
-            <div class="appointment-visitor">
-                ${apt.visitor_name}
-            </div>
-            <div class="appointment-stage">
-                <i class="fas fa-graduation-cap"></i>
-                ${apt.stage__name}
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // Funciones del modal
@@ -1436,24 +1574,55 @@ async function loadCourses(stageId) {
     const courseSelect = document.getElementById('course');
     const courseContainer = document.getElementById('course-container');
     
-    if (!stageId || stageId === '') {
+    // VALIDACIÓN ROBUSTA: Si recibe un objeto Event, extraer el valor
+    if (typeof stageId === 'object' && stageId !== null) {
+        console.warn('loadCourses received Event object instead of value, extracting...');
+        stageId = stageId.target ? stageId.target.value : '';
+    }
+    
+    console.log('loadCourses called with stageId:', stageId, 'type:', typeof stageId);
+    
+    // Validar que stageId sea un número o string numérico válido
+    if (!stageId || stageId === '' || stageId === 'undefined' || stageId === 'null') {
+        console.log('Invalid stageId, hiding course container');
         courseContainer.style.display = 'none';
         return;
     }
     
     try {
-        const response = await fetch(`/api/stage/${stageId}/courses/`);
-        const courses = await response.json();
+        const url = `/api/stage/${stageId}/courses/`;
+        console.log('Fetching courses from:', url);
         
-        courseSelect.innerHTML = '<option value="">Seleccione un curso (opcional)</option>';
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            console.error(`HTTP error! status: ${response.status}`);
+            const text = await response.text();
+            console.error('Response text:', text.substring(0, 200));
+            throw new Error(`Error al cargar cursos: ${response.status}`);
+        }
+        
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            console.error('Response is not JSON:', contentType);
+            const text = await response.text();
+            console.error('Response text:', text.substring(0, 200));
+            throw new Error('La respuesta no es JSON');
+        }
+        
+        const courses = await response.json();
+        console.log('Courses loaded successfully:', courses);
+        
+        courseSelect.innerHTML = '<option value="">Seleccione un curso</option>';
         courses.forEach(course => {
             courseSelect.innerHTML += `<option value="${course.id}">${course.name}</option>`;
         });
         
         courseContainer.style.display = 'block';
     } catch (error) {
-        console.error('Error:', error);
-        showToast('Error cargando cursos', 'error');
+        console.error('Error in loadCourses:', error);
+        showToast('Error cargando cursos: ' + error.message, 'error');
+        courseContainer.style.display = 'none';
     }
 }
 
@@ -1467,13 +1636,21 @@ async function saveAppointment() {
     const appointmentId = document.getElementById('appointment_id').value;
     const staffId = document.getElementById('appointment_staff_id').value;
     
+    // Validación adicional: Curso es obligatorio
+    const courseValue = document.getElementById('course').value;
+    if (!courseValue || courseValue === '') {
+        showToast('Debe seleccionar un curso', 'error');
+        document.getElementById('course').focus();
+        return;
+    }
+    
     const data = {
         staff: staffId,
         visitor_name: document.getElementById('visitor_name').value,
         visitor_email: document.getElementById('visitor_email').value,
         visitor_phone: document.getElementById('visitor_phone').value,
         stage: document.getElementById('stage').value,
-        course: document.getElementById('course').value || null,
+        course: courseValue,  // Ya no puede ser null
         duration: parseInt(document.getElementById('duration').value),
         status: document.getElementById('status').value,
         notes: document.getElementById('notes').value || '',
