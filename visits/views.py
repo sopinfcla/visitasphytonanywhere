@@ -531,16 +531,34 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
             for stage in staff_profile.allowed_stages.all():
                 base_slot = AvailabilitySlot(**base_slot_data, stage=stage)
                 slots_generated = base_slot.generate_slots()
-                created = AvailabilitySlot.objects.bulk_create(slots_generated)
+                
+                # CORRECCIÓN: bulk_create con update_fields para asegurar que devuelva IDs
+                # En SQLite esto funciona desde Django 3.2+
+                created = AvailabilitySlot.objects.bulk_create(
+                    slots_generated,
+                    batch_size=100
+                )
                 created_slots.extend(created)
             
-            # Agrupar slots para la respuesta
+            # Verificar que todos los slots tengan ID antes de continuar
+            if not all(slot.id for slot in created_slots):
+                logger.error("Algunos slots no tienen ID después de bulk_create")
+                # Recargar los slots desde la base de datos
+                created_slots = list(AvailabilitySlot.objects.filter(
+                    staff=staff_profile,
+                    date__in=[s.date for s in created_slots if s.date],
+                    start_time=start_time,
+                    end_time=end_time
+                ).order_by('id'))
+            
+            # CORRECCIÓN: Agrupar slots para la respuesta asegurando IDs válidos
             grouped_slots = {}
             for slot in created_slots:
                 key = (slot.date, slot.start_time, slot.end_time)
                 if key not in grouped_slots:
+                    # Guardar el ID del primer slot del grupo (siempre será válido)
                     grouped_slots[key] = {
-                        'id': slot.id,
+                        'id': slot.id,  # ID del primer slot creado para esta combinación
                         'date': slot.date.strftime('%d/%m/%Y') if slot.date else '',
                         'start_time': slot.start_time.strftime('%H:%M'),
                         'end_time': slot.end_time.strftime('%H:%M'),
@@ -548,8 +566,16 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
                         'stages': [slot.stage.name]
                     }
                 else:
+                    # Añadir stages adicionales pero mantener el ID del primer slot
                     grouped_slots[key]['stages'].append(slot.stage.name)
-                    
+            
+            logger.info(f"Creados {len(created_slots)} slots, agrupados en {len(grouped_slots)} entradas")
+            
+            # Debug: Verificar que todos los grupos tienen ID válido
+            for group_key, group_data in grouped_slots.items():
+                if not group_data.get('id'):
+                    logger.error(f"Grupo sin ID: {group_key} -> {group_data}")
+            
             return JsonResponse({'slots': list(grouped_slots.values())})
             
         except Exception as e:
@@ -564,8 +590,22 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
                 
             if not slot_id:
                 return JsonResponse({'error': 'No se proporcionó el ID del slot'}, status=400)
-                
-            base_slot = get_object_or_404(AvailabilitySlot, id=slot_id, staff=request.user.staffprofile)
+            
+            logger.info(f"Intentando eliminar slot con ID: {slot_id}")
+            
+            # Obtener el slot base
+            try:
+                base_slot = AvailabilitySlot.objects.get(
+                    id=slot_id, 
+                    staff=request.user.staffprofile
+                )
+            except AvailabilitySlot.DoesNotExist:
+                logger.error(f"Slot {slot_id} no encontrado o no pertenece al usuario")
+                return JsonResponse({
+                    'error': 'Slot no encontrado o no tienes permisos para eliminarlo'
+                }, status=404)
+            
+            # Verificar si tiene citas programadas
             has_appointments = Appointment.objects.filter(
                 staff=base_slot.staff,
                 date__date=base_slot.date,
@@ -573,17 +613,29 @@ class StaffAvailabilityView(LoginRequiredMixin, View):
             ).exists()
             
             if has_appointments:
-                return JsonResponse({'error': 'No se puede eliminar un slot con citas programadas'}, status=400)
-                
-            # Eliminar todos los slots relacionados para esa fecha y horario
+                logger.warning(f"Intento de eliminar slot {slot_id} con citas programadas")
+                return JsonResponse({
+                    'error': 'No se puede eliminar un slot con citas programadas'
+                }, status=400)
+            
+            # Eliminar todos los slots relacionados (mismo staff, fecha y horario)
             slots_to_delete = AvailabilitySlot.objects.filter(
                 staff=base_slot.staff,
                 date=base_slot.date,
                 start_time=base_slot.start_time,
                 end_time=base_slot.end_time
             )
-            count = slots_to_delete.delete()[0]
-            return JsonResponse({'status': 'success', 'deleted_count': count})
+            
+            count = slots_to_delete.count()
+            logger.info(f"Eliminando {count} slots relacionados")
+            
+            slots_to_delete.delete()
+            
+            return JsonResponse({
+                'status': 'success', 
+                'deleted_count': count,
+                'message': f'Se eliminaron {count} slot(s) correctamente'
+            })
             
         except Exception as e:
             logger.error(f"Error deleting slot {slot_id}: {str(e)}", exc_info=True)

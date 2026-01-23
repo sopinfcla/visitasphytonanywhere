@@ -241,9 +241,21 @@ $(document).ready(function() {
                 }
 
                 const data = await response.json();
-                if (data.slots) {
-                    data.slots.forEach(slot => table.row.add(slot).draw());
+                
+                if (data.slots && data.slots.length > 0) {
+                    // Añadir cada slot a la tabla
+                    data.slots.forEach(slot => {
+                        // Verificar que el slot tenga un ID válido
+                        if (!slot.id) {
+                            return; // Skip este slot
+                        }
+                        
+                        table.row.add(slot).draw();
+                    });
+                    
+                    alert(`Se crearon ${data.slots.length} slot(s) correctamente`);
                 }
+                
                 this.reset();
                 generateTimeOptions(); // Regenerar opciones después del reset
             } catch (error) {
@@ -270,27 +282,43 @@ $(document).ready(function() {
 
 // Función para eliminar slot
 async function deleteSlot(id) {
+    // Validar que el ID sea válido
+    if (!id || id === 'undefined' || id === 'null') {
+        alert('Error: ID de slot inválido. Por favor, recarga la página e intenta de nuevo.');
+        return;
+    }
+    
     if (confirm('¿Confirmas eliminar esta disponibilidad?')) {
         try {
             const response = await fetch(`/api/availability/${id}/`, {
                 method: 'DELETE',
                 headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json'
                 }
             });
             
             if (!response.ok) {
-                throw new Error('Error al eliminar el slot');
+                const errorData = await response.json();
+                throw new Error(errorData.error || `Error ${response.status}: ${response.statusText}`);
             }
             
+            const data = await response.json();
+            
+            // Eliminar la fila de DataTables
+            const button = $(`button[onclick="deleteSlot(${id})"]`);
+            const row = button.closest('tr');
+            
             $('#slots-table').DataTable()
-                .row($(`button[onclick="deleteSlot(${id})"]`).closest('tr'))
+                .row(row)
                 .remove()
                 .draw();
+            
+            // Mensaje único y simple
+            alert('Disponibilidad eliminada correctamente');
                 
         } catch (error) {
             alert('Error al eliminar el slot: ' + error.message);
-            console.error('Error:', error);
         }
     }
 }
